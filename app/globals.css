@@ -92,37 +92,54 @@ h1 { font-size: clamp(28px, 4.4vw, 42px); font-weight: 700; line-height: 1.05; }
 
 /* ---------- toolbar ---------- */
 .toolbar { display: flex; gap: 10px 12px; align-items: flex-end; flex-wrap: wrap; }
-.search { position: relative; flex: 1 1 200px; max-width: 300px; }
-.search input {
-  width: 100%; padding: 9px 12px 9px 32px; font: inherit; font-size: 14px;
-  background: var(--surface); color: var(--ink);
-  border: 1px solid var(--line-strong); border-radius: 7px;
-}
-.search input::placeholder { color: var(--muted); }
-.search .mag { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; font-size: 13px; }
 .seg { display: flex; background: var(--surface-2); border: 1px solid var(--line); border-radius: 7px; padding: 2px; gap: 2px; }
 .seg button {
-  font: inherit; font-size: 13px; font-weight: 500; padding: 6px 13px; border: 0; border-radius: 5px;
+  font: inherit; font-size: 13px; font-weight: 500; padding: 8px 13px; border: 0; border-radius: 5px;
   background: transparent; color: var(--ink-2); cursor: pointer;
 }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 22, 32, .10); }
 
-.field { display: flex; flex-direction: column; gap: 3px; }
-.field:has(.search) { flex: 1 1 200px; max-width: 320px; }
-.field .search { flex: 1 1 auto; max-width: none; width: 100%; }
+.field { display: flex; flex-direction: column; gap: 4px; }
 .field-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-.field select,
-.toolbar select {
-  font: inherit; font-size: 14px; padding: 8px 30px 8px 11px; border-radius: 7px;
+
+/* ---------- combobox (3 ô lọc chung 1 kiểu) ---------- */
+.combo { position: relative; flex: 1 1 190px; max-width: 250px; min-width: 0; }
+.combo-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 7px;
   background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
-  cursor: pointer; max-width: 240px;
-  appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
-  background-position: right 14px center, right 9px center;
-  background-size: 5px 5px, 5px 5px;
-  background-repeat: no-repeat;
+  cursor: pointer; text-align: left;
 }
-.field select:focus-visible, .toolbar select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.combo-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.combo-val { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.combo-caret { color: var(--muted); font-size: 10px; flex-shrink: 0; }
+.combo-dot {
+  width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0;
+  border: 1px solid var(--line-strong); background: var(--surface-2);
+}
+.combo-dot--ghost { visibility: hidden; }
+
+.combo-panel {
+  position: absolute; top: calc(100% + 5px); left: 0; z-index: 60;
+  min-width: 100%; width: max-content; max-width: 320px;
+  background: var(--surface); border: 1px solid var(--line-strong); border-radius: 9px;
+  box-shadow: var(--shadow); padding: 5px; overflow: hidden;
+}
+.combo-search {
+  width: 100%; font: inherit; font-size: 13.5px; padding: 7px 9px; margin-bottom: 4px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 6px;
+}
+.combo-search:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.combo-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.combo-opt {
+  display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 6px;
+  font-size: 13.5px; cursor: pointer; line-height: 1.3;
+}
+.combo-opt.active { background: var(--surface-2); }
+.combo-opt.sel { font-weight: 600; }
+.combo-opt.sel::after { content: "✓"; margin-left: auto; color: var(--focus); font-size: 12px; }
+.combo-empty { padding: 9px; font-size: 13px; color: var(--muted); }
 
 /* ---------- map ---------- */
 .mapcard {
@@ -138,8 +155,17 @@ svg.map path {
 }
 @media (prefers-reduced-motion: reduce) { svg.map path { transition: none; } }
 svg.map path.hit { cursor: pointer; }
-svg.map path.dim { opacity: .22; }
+svg.map path.dim { opacity: .16; }
 svg.map path.sel { stroke: var(--ink); stroke-width: 1.6; }
+
+.focus-clear {
+  position: absolute; left: 12px; top: 12px; z-index: 6;
+  font: inherit; font-size: 12.5px; font-weight: 500; padding: 7px 12px;
+  background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line-strong); border-radius: 7px;
+  box-shadow: var(--shadow); cursor: pointer;
+}
+.focus-clear:hover { background: var(--surface-2); }
 .t-free { fill: var(--t1); } .t-eta { fill: var(--t2); } .t-evisa { fill: var(--t3); }
 .t-voa { fill: var(--t4); } .t-visa { fill: var(--t5); }
 .t-nodata { fill: var(--nodata); } .t-home { fill: var(--home-fill); stroke: var(--ink); stroke-width: 1.2; }
@@ -239,6 +265,7 @@ th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: v
 td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
 tbody tr:hover { background: var(--surface-2); }
 tbody tr { cursor: pointer; }
+tbody tr.row-sel { background: var(--surface-3); box-shadow: inset 3px 0 0 var(--focus); }
 .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; white-space: nowrap; }
 
 /* ---------- footer ---------- */

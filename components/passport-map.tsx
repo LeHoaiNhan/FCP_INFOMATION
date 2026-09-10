@@ -12,6 +12,7 @@ import {
   type Destination,
 } from "@/lib/visa";
 import { TIERS, metaOf, type TierKey, type AnyTier } from "@/lib/tiers";
+import Combobox, { type ComboOption } from "./combobox";
 
 const BASE = { x: 0, y: 0, w: 1000, h: 480 };
 
@@ -20,7 +21,8 @@ export default function PassportMap() {
   const [selected, setSelected] = useState("IND");
   const [tierFilter, setTierFilter] = useState<TierKey | "">("");
   const [view, setView] = useState<"map" | "table">("map");
-  const [query, setQuery] = useState("");
+  /** true khi chọn một nước đến từ ô "Nước đến" → bản đồ chỉ sáng nước đó */
+  const [focused, setFocused] = useState(false);
 
   const destinations = useMemo(() => destinationsFor(passport), [passport]);
   const byCode = useMemo(
@@ -76,6 +78,52 @@ export default function PassportMap() {
   function resetZoom() {
     vb.current = { ...BASE };
     applyVB();
+  }
+
+  /** Phóng bản đồ về khung bao của một nước (đọc toạ độ từ path d). */
+  function zoomToCountry(d: string) {
+    const nums = d.match(/-?\d*\.?\d+/g);
+    if (!nums || nums.length < 4) return;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    for (let i = 0; i + 1 < nums.length; i += 2) {
+      const x = +nums[i];
+      const y = +nums[i + 1];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    let w = (maxX - minX) * 2.4 + 16;
+    let h = (maxY - minY) * 2.4 + 16;
+    const aspect = BASE.w / BASE.h;
+    if (w / h > aspect) h = w / aspect;
+    else w = h * aspect;
+    if (w >= BASE.w) {
+      vb.current = { ...BASE };
+    } else {
+      vb.current = { x: cx - w / 2, y: cy - h / 2, w, h };
+      clampVB();
+    }
+    applyVB();
+  }
+
+  function pickDestination(code: string) {
+    setSelected(code);
+    setFocused(true);
+    setView("map");
+    const d = byCode.get(code)?.d;
+    if (d) zoomToCountry(d);
+    else resetZoom();
+  }
+
+  function clearFocus() {
+    setFocused(false);
+    resetZoom();
   }
 
   function codeAt(target: EventTarget): string | null {
@@ -142,7 +190,10 @@ export default function PassportMap() {
   function onClick(e: RMouseEvent<SVGSVGElement>) {
     if (moved.current > 5) return;
     const code = codeAt(e.target);
-    if (code && tierOf(code) !== "nodata") setSelected(code);
+    if (code && tierOf(code) !== "nodata") {
+      setSelected(code);
+      setFocused(false);
+    }
   }
 
   // path list — dựng lại khi hộ chiếu / điểm chọn / bộ lọc đổi
@@ -150,10 +201,13 @@ export default function PassportMap() {
     () =>
       shaped.map((d) => {
         const meta = metaOf(d.tier);
+        const dim =
+          (!!tierFilter && d.tier !== tierFilter) ||
+          (focused && d.code !== selected);
         const cls = [
           meta.cls,
           d.tier !== "nodata" ? "hit" : "",
-          tierFilter && d.tier !== tierFilter ? "dim" : "",
+          dim ? "dim" : "",
           selected === d.code ? "sel" : "",
         ]
           .filter(Boolean)
@@ -162,7 +216,7 @@ export default function PassportMap() {
           <path key={d.code} d={d.d as string} className={cls} data-code={d.code} />
         );
       }),
-    [shaped, selected, tierFilter],
+    [shaped, selected, tierFilter, focused],
   );
 
   const sel: Destination | undefined = byCode.get(selected);
@@ -179,9 +233,18 @@ export default function PassportMap() {
   const tableRows = destinations.filter((d) => {
     if (d.tier === "home") return false;
     if (tierFilter && d.tier !== tierFilter) return false;
-    const q = query.trim().toLowerCase();
-    return !q || d.name.toLowerCase().includes(q);
+    return true;
   });
+
+  const nationOptions: ComboOption[] = NATIONS.map((n) => ({
+    value: n.code,
+    label: n.name,
+    flag: flagSrc(n.a2),
+  }));
+  const visaOptions: ComboOption[] = [
+    { value: "", label: "Tất cả loại visa", dot: "" },
+    ...TIERS.map((t) => ({ value: t.k, label: t.label, dot: t.v })),
+  ];
 
   const mrz = (() => {
     const pad = (s: string, n: number) => (s + "<".repeat(n)).slice(0, n);
@@ -207,8 +270,8 @@ export default function PassportMap() {
             <h1>Hộ chiếu {passportName(passport)} đi đâu?</h1>
             <p className="sub">
               Mỗi nước được tô theo <strong>mức thủ tục</strong> hộ chiếu này phải
-              làm trước chuyến đi — từ miễn thị thực đến phải xin visa tại đại sứ
-              quán. Đổi hộ chiếu ở thanh công cụ; bấm một nước để xem chi tiết.
+              làm trước chuyến đi. Bấm một nước trên bản đồ để xem chi tiết, hoặc
+              chọn ở ô <strong>Nước đến</strong> để bản đồ soi riêng nước đó.
             </p>
           </div>
           <div className="passport">
@@ -248,66 +311,26 @@ export default function PassportMap() {
       </header>
 
       <div className="toolbar">
-        <label className="field">
-          <span className="field-lbl">Hộ chiếu</span>
-          <select
-            value={passport}
-            onChange={(e) => setPassport(e.target.value)}
-          >
-            {NATIONS.map((n) => (
-              <option key={n.code} value={n.code}>
-                {n.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field">
-          <span className="field-lbl">Nước đến</span>
-          <div className="search">
-            <span className="mag" aria-hidden="true">
-              ⌕
-            </span>
-            <input
-              type="search"
-              placeholder="Tìm nước đến…"
-              aria-label="Tìm nước đến"
-              autoComplete="off"
-              list="destinations"
-              value={query}
-              onChange={(e) => {
-                const v = e.target.value;
-                setQuery(v);
-                const hit = destinations.find(
-                  (d) => d.name.toLowerCase() === v.trim().toLowerCase(),
-                );
-                if (hit) setSelected(hit.code);
-              }}
-            />
-            <datalist id="destinations">
-              {destinations
-                .filter((d) => d.tier !== "home")
-                .map((d) => (
-                  <option key={d.code} value={d.name} />
-                ))}
-            </datalist>
-          </div>
-        </label>
-
-        <label className="field">
-          <span className="field-lbl">Loại visa</span>
-          <select
-            value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value as TierKey | "")}
-          >
-            <option value="">Tất cả</option>
-            {TIERS.map((t) => (
-              <option key={t.k} value={t.k}>
-                {t.short}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Combobox
+          label="Hộ chiếu"
+          value={passport}
+          options={nationOptions}
+          onChange={setPassport}
+          searchable
+        />
+        <Combobox
+          label="Nước đến"
+          value={selected}
+          options={nationOptions}
+          onChange={pickDestination}
+          searchable
+        />
+        <Combobox
+          label="Loại visa"
+          value={tierFilter}
+          options={visaOptions}
+          onChange={(v) => setTierFilter(v as TierKey | "")}
+        />
 
         <div className="seg" role="group" aria-label="Chế độ xem">
           <button aria-pressed={view === "map"} onClick={() => setView("map")}>
@@ -339,6 +362,11 @@ export default function PassportMap() {
             {paths}
           </svg>
           <div className="tip" ref={tipRef} aria-hidden="true" />
+          {focused && (
+            <button className="focus-clear" onClick={clearFocus}>
+              ← Hiện tất cả các nước
+            </button>
+          )}
           <div className="zoom">
             <button title="Phóng to" aria-label="Phóng to" onClick={() => zoom(1 / 1.5)}>
               +
@@ -403,10 +431,8 @@ export default function PassportMap() {
                   return (
                     <tr
                       key={d.code}
-                      onClick={() => {
-                        setSelected(d.code);
-                        setView("map");
-                      }}
+                      className={d.code === selected ? "row-sel" : undefined}
+                      onClick={() => pickDestination(d.code)}
                     >
                       <td>
                         <span className="cell-nation">
