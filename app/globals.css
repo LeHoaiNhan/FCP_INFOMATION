@@ -9,8 +9,8 @@
   --ink: #0f1620; --ink-2: #515c6b; --muted: #8791a0;
   --line: #dde2ea; --line-strong: #c3cbd6;
   --ocean: #e8ecf2; --nodata: #cfd6e0; --home-fill: #b9c2ce; --noadmission: #a02b38;
-  /* xanh lá → xanh dương → xanh dương nhạt → cam → đỏ nhạt (ít → nhiều thủ tục) */
-  --t1: #37a24b; --t2: #2f7bd6; --t3: #8ec6ef; --t4: #e2892f; --t5: #db5b66;
+  /* xanh lá → xanh dương nhạt → xanh dương đậm → cam → đỏ nhạt (ít → nhiều thủ tục) */
+  --t1: #37a24b; --t2: #6aa9e0; --t3: #1a4f96; --t4: #e2892f; --t5: #db5b66;
   --sep: #ffffff;
   --focus: #2f7bd6;
   --shadow: 0 1px 2px rgba(15, 22, 32, .06), 0 8px 24px -12px rgba(15, 22, 32, .18);
@@ -27,7 +27,7 @@
     --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
     --line: #252c37; --line-strong: #39424f;
     --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #b23b48;
-    --t1: #46b45c; --t2: #4a91e6; --t3: #93c3e8; --t4: #e0954a; --t5: #e07782;
+    --t1: #46b45c; --t2: #8fbdec; --t3: #3f7fd0; --t4: #e0954a; --t5: #e07782;
     --sep: #0b0e13;
     --focus: #6da7ec;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
