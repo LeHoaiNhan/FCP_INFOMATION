@@ -8,10 +8,11 @@
   --bg: #f4f6f9; --surface: #ffffff; --surface-2: #eceff4; --surface-3: #e2e7ee;
   --ink: #0f1620; --ink-2: #515c6b; --muted: #8791a0;
   --line: #dde2ea; --line-strong: #c3cbd6;
-  --ocean: #e8ecf2; --nodata: #cfd6e0; --home-fill: #b9c2ce; --noadmission: #b5555f;
-  --t1: #86b6ef; --t2: #5598e7; --t3: #2a78d6; --t4: #1c5cab; --t5: #0d366b;
+  --ocean: #e8ecf2; --nodata: #cfd6e0; --home-fill: #b9c2ce; --noadmission: #a02b38;
+  /* xanh lá → xanh dương → xanh dương nhạt → cam → đỏ nhạt (ít → nhiều thủ tục) */
+  --t1: #37a24b; --t2: #2f7bd6; --t3: #8ec6ef; --t4: #e2892f; --t5: #db5b66;
   --sep: #ffffff;
-  --focus: #2a78d6;
+  --focus: #2f7bd6;
   --shadow: 0 1px 2px rgba(15, 22, 32, .06), 0 8px 24px -12px rgba(15, 22, 32, .18);
 
   --sans: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -25,8 +26,8 @@
     --bg: #0b0e13; --surface: #141920; --surface-2: #1b212a; --surface-3: #232a35;
     --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
     --line: #252c37; --line-strong: #39424f;
-    --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f;
-    --t1: #184f95; --t2: #256abf; --t3: #3987e5; --t4: #6da7ec; --t5: #9ec5f4;
+    --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #b23b48;
+    --t1: #46b45c; --t2: #4a91e6; --t3: #93c3e8; --t4: #e0954a; --t5: #e07782;
     --sep: #0b0e13;
     --focus: #6da7ec;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
@@ -38,8 +39,8 @@
   --bg: #0b0e13; --surface: #141920; --surface-2: #1b212a; --surface-3: #232a35;
   --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
   --line: #252c37; --line-strong: #39424f;
-  --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #7a3b42;
-  --t1: #184f95; --t2: #256abf; --t3: #3987e5; --t4: #6da7ec; --t5: #9ec5f4;
+  --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #b23b48;
+  --t1: #46b45c; --t2: #4a91e6; --t3: #93c3e8; --t4: #e0954a; --t5: #e07782;
   --sep: #0b0e13;
   --focus: #6da7ec;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
@@ -161,6 +162,8 @@ svg.map path.sel { stroke: var(--ink); stroke-width: 1.6; }
 .tip.on { opacity: 1; }
 .tip .n { font-family: var(--archivo); font-weight: 600; font-size: 13.5px; line-height: 1.25; }
 .tip .r { display: flex; align-items: center; gap: 7px; margin-top: 5px; font-size: 12.5px; color: var(--ink-2); }
+.tip .note { margin-top: 5px; font-size: 11.5px; line-height: 1.4; color: var(--muted); max-width: 220px; }
+.tip { max-width: 260px; }
 .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; display: inline-block; }
 
 /* ---------- legend ---------- */
@@ -201,6 +204,7 @@ svg.map path.sel { stroke: var(--ink); stroke-width: 1.6; }
 .fact dt { font-size: 11px; color: var(--muted); letter-spacing: .03em; margin: 0 0 3px; }
 .fact dd { margin: 0; font-family: var(--mono); font-size: 16px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
 .fact dd small { font-family: var(--sans); font-size: 11.5px; color: var(--ink-2); font-weight: 400; margin-left: 2px; }
+.verdict-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); }
 .src { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 11px; flex-wrap: wrap; }
 .src a { color: var(--focus); text-decoration: none; }
 .src a:hover { text-decoration: underline; }

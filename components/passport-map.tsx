@@ -93,7 +93,7 @@ export default function PassportMap() {
     tip.innerHTML = `<div class="n">${d.name}</div>
       <div class="r"><span class="sw" style="background:var(${meta.v})"></span>${meta.label}${
         rich ? stay : ""
-      }</div>`;
+      }</div>${meta.note ? `<div class="note">${meta.note}</div>` : ""}`;
     const box = stage.getBoundingClientRect();
     tip.style.left = `${cx - box.left}px`;
     tip.style.top = `${cy - box.top}px`;
@@ -432,8 +432,8 @@ export default function PassportMap() {
             <li>
               <span className="num">{counts.visa ?? 0}</span>
               <p>
-                <b>Nước phải xin visa trước</b> — nộp hồ sơ trực tiếp tại đại sứ
-                quán hoặc trung tâm tiếp nhận.
+                <b>Nước phải xin visa tại đại sứ quán</b> — nộp hồ sơ giấy trực
+                tiếp, chờ 1–4 tuần rồi mới bay được.
               </p>
             </li>
             <li>
@@ -480,6 +480,7 @@ export default function PassportMap() {
               </dd>
             </div>
           </dl>
+          {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
           <div className="src">
             <span>
               Nguồn chính thức: <span className="mono">chưa gắn</span>
@@ -497,11 +498,12 @@ export default function PassportMap() {
         </div>
         <p className="foot-note">
           Phép chiếu <strong>Equal Earth</strong> — bảo toàn tỷ lệ diện tích. Thang
-          màu dùng <strong>một tông xanh, đậm dần theo mức thủ tục</strong>: thứ
-          bậc mã hoá bằng độ sáng chứ không bằng sắc màu, nên bản đồ vẫn đọc được
-          với người mù màu và khi in đen trắng. Ở độ phân giải 110m, các nước siêu
-          nhỏ (Singapore, Bahrain, Maldives, Malta…) không có hình đa giác — vẫn
-          có trong bảng và ô tìm kiếm.
+          màu đi từ <strong>xanh lá</strong> (ít thủ tục) qua xanh dương, cam, tới{" "}
+          <strong>đỏ</strong> (visa tại đại sứ quán). Vì có người khó phân biệt
+          xanh–đỏ, mỗi mức còn khác nhau về độ sáng và luôn kèm nhãn chữ ở chú
+          giải, khi rê chuột và trong bảng. Ở độ phân giải 110m, các nước siêu nhỏ
+          (Singapore, Bahrain, Maldives, Malta…) không có hình đa giác — vẫn có
+          trong bảng và ô tìm kiếm.
         </p>
       </footer>
     </div>

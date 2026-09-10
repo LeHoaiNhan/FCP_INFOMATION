@@ -19,14 +19,21 @@ export interface Tier {
   bar: string;
   /** biến CSS dùng cho ô màu nhỏ (swatch) */
   v: string;
+  /** chú thích ngắn, hiện khi rê chuột / trong thẻ kết luận */
+  note?: string;
 }
 
 export const TIERS: Tier[] = [
-  { k: "free", n: 1, label: "Miễn thị thực", short: "Miễn thị thực", cls: "t-free", bar: "tier-b1", v: "--t1" },
-  { k: "eta", n: 2, label: "eTA — cấp phép điện tử", short: "eTA", cls: "t-eta", bar: "tier-b2", v: "--t2" },
-  { k: "evisa", n: 3, label: "eVisa — thị thực điện tử", short: "eVisa", cls: "t-evisa", bar: "tier-b3", v: "--t3" },
-  { k: "voa", n: 4, label: "Cấp tại cửa khẩu", short: "Tại cửa khẩu", cls: "t-voa", bar: "tier-b4", v: "--t4" },
-  { k: "visa", n: 5, label: "Phải xin trước", short: "Xin visa trước", cls: "t-visa", bar: "tier-b5", v: "--t5" },
+  { k: "free", n: 1, label: "Miễn thị thực", short: "Miễn thị thực", cls: "t-free", bar: "tier-b1", v: "--t1",
+    note: "Đưa hộ chiếu là qua, không giấy tờ xin trước" },
+  { k: "eta", n: 2, label: "eTA — cấp phép điện tử", short: "eTA", cls: "t-eta", bar: "tier-b2", v: "--t2",
+    note: "Khai online, duyệt tự động trong vài phút–vài giờ" },
+  { k: "evisa", n: 3, label: "eVisa — thị thực điện tử", short: "eVisa", cls: "t-evisa", bar: "tier-b3", v: "--t3",
+    note: "Nộp hồ sơ online, chờ vài ngày, nhận file PDF — không cần đến đại sứ quán" },
+  { k: "voa", n: 4, label: "Cấp tại cửa khẩu", short: "Tại cửa khẩu", cls: "t-voa", bar: "tier-b4", v: "--t4",
+    note: "Không xin trước — làm ngay tại sân bay/cửa khẩu khi tới nơi, đóng phí, dán tem" },
+  { k: "visa", n: 5, label: "Visa tại đại sứ quán", short: "Visa ĐSQ", cls: "t-visa", bar: "tier-b5", v: "--t5",
+    note: "Nộp hồ sơ giấy tại đại sứ quán / lãnh sự / trung tâm visa, chờ 1–4 tuần, rồi mới bay được" },
 ];
 
 export const TMAP: Record<TierKey, Tier> = Object.fromEntries(
@@ -49,7 +56,7 @@ export const ORDER: Record<string, number> = {
 
 export function metaOf(
   tier: AnyTier,
-): { label: string; cls: string; v: string; short: string } {
+): { label: string; cls: string; v: string; short: string; note?: string } {
   if (tier in TMAP) return TMAP[tier as TierKey];
   return EXTRA[tier as SpecialKey];
 }
