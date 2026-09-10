@@ -6,6 +6,8 @@ import {
   NATIONS,
   destinationsFor,
   passportName,
+  passportFlag,
+  flagSrc,
   DEFAULT_PASSPORT,
   type Destination,
 } from "@/lib/visa";
@@ -90,7 +92,11 @@ export default function PassportMap() {
     const meta = metaOf(d.tier);
     const rich = d.tier !== "nodata" && d.tier !== "home";
     const stay = d.stay ? ` · ${d.stay} ngày` : "";
-    tip.innerHTML = `<div class="n">${d.name}</div>
+    const fsrc = flagSrc(d.a2);
+    const flag = fsrc
+      ? `<img class="flag-img" src="${fsrc}" alt="" width="18" height="13">`
+      : "";
+    tip.innerHTML = `<div class="n">${flag}${d.name}</div>
       <div class="r"><span class="sw" style="background:var(${meta.v})"></span>${meta.label}${
         rich ? stay : ""
       }</div>${meta.note ? `<div class="note">${meta.note}</div>` : ""}`;
@@ -206,9 +212,19 @@ export default function PassportMap() {
             </p>
           </div>
           <div className="passport">
-            <span className="flag" aria-hidden="true">
-              🛂
-            </span>
+            {passportFlag(passport) ? (
+              <img
+                className="flag-img flag-lg"
+                src={passportFlag(passport) as string}
+                alt=""
+                width={30}
+                height={22}
+              />
+            ) : (
+              <span className="flag" aria-hidden="true">
+                🛂
+              </span>
+            )}
             <span>
               <span className="code">P&lt;{passport}</span>
               <span className="cap">{passportName(passport)}</span>
@@ -392,7 +408,20 @@ export default function PassportMap() {
                         setView("map");
                       }}
                     >
-                      <td>{d.name}</td>
+                      <td>
+                        <span className="cell-nation">
+                          {flagSrc(d.a2) && (
+                            <img
+                              className="flag-img"
+                              src={flagSrc(d.a2) as string}
+                              alt=""
+                              width={20}
+                              height={15}
+                            />
+                          )}
+                          {d.name}
+                        </span>
+                      </td>
                       <td>
                         <span className="pill">
                           <span className="sw" style={{ background: `var(${m.v})` }} />
@@ -449,7 +478,18 @@ export default function PassportMap() {
         <div className="panel verdict">
           <div className="verdict-head">
             <div>
-              <h2>{sel?.name ?? "—"}</h2>
+              <h2 className="verdict-name">
+                {flagSrc(sel?.a2) && (
+                  <img
+                    className="flag-img flag-lg"
+                    src={flagSrc(sel?.a2) as string}
+                    alt=""
+                    width={28}
+                    height={21}
+                  />
+                )}
+                {sel?.name ?? "—"}
+              </h2>
               <div className="iso">
                 HỘ CHIẾU {passport} → {selected}
               </div>

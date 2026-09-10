@@ -8,6 +8,8 @@ export interface Nation {
   /** ISO-3166 alpha-3 */
   code: string;
   name: string;
+  /** ISO-3166 alpha-2 (viết thường) — tên file cờ trong /public/flags */
+  a2: string | null;
 }
 
 /** Hình đa giác một nước trên bản đồ (Equal Earth, viewBox 1000×480). */
@@ -22,6 +24,8 @@ export interface GeoShape {
 export interface Destination {
   code: string;
   name: string;
+  /** ISO-3166 alpha-2 (viết thường) cho cờ */
+  a2: string | null;
   /** path SVG — null nếu nước quá nhỏ, không có đa giác ở độ phân giải 110m */
   d: string | null;
   tier: AnyTier;
@@ -47,6 +51,9 @@ const GEO_BY_ISO3: Record<string, GeoShape> = Object.fromEntries(
 const NAME_BY_CODE: Record<string, string> = Object.fromEntries(
   NATIONS.map((n) => [n.code, n.name]),
 );
+const A2_BY_CODE: Record<string, string | null> = Object.fromEntries(
+  NATIONS.map((n) => [n.code, n.a2]),
+);
 
 export const DEFAULT_PASSPORT = "VNM";
 
@@ -70,6 +77,7 @@ export function destinationsFor(passport: string): Destination[] {
     return {
       code: n.code,
       name: n.name,
+      a2: n.a2,
       d: shape?.d ?? null,
       tier: n.code === passport ? "home" : tier,
       stay,
@@ -87,4 +95,13 @@ export function destinationsFor(passport: string): Destination[] {
 
 export function passportName(code: string): string {
   return NAME_BY_CODE[code] ?? code;
+}
+
+/** Đường dẫn file cờ trong /public, hoặc null nếu nước không có alpha-2. */
+export function flagSrc(a2: string | null | undefined): string | null {
+  return a2 ? `/flags/${a2}.svg` : null;
+}
+
+export function passportFlag(code: string): string | null {
+  return flagSrc(A2_BY_CODE[code]);
 }

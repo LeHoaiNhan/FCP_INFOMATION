@@ -40,11 +40,21 @@ const [tidyIso, tidyName, isoCsv] = await Promise.all([
   get(SRC.tidyIso), get(SRC.tidyName), get(SRC.iso),
 ]);
 
-// ISO alpha-3 -> official English name (fallback tên hiển thị)
+// ISO alpha-3 -> official English name + alpha-2 (cho cờ)
 const iso = parseCSV(isoCsv);
-const iA3 = iso[0].indexOf("alpha-3"), iNm = iso[0].indexOf("name");
+const iA3 = iso[0].indexOf("alpha-3");
+const iA2 = iso[0].indexOf("alpha-2");
+const iNm = iso[0].indexOf("name");
 const isoName = {};
-for (let i = 1; i < iso.length; i++) if (iso[i][iA3]) isoName[iso[i][iA3]] = iso[i][iNm];
+const isoA2 = {};
+for (let i = 1; i < iso.length; i++) {
+  const a3 = iso[i][iA3];
+  if (!a3) continue;
+  isoName[a3] = iso[i][iNm];
+  isoA2[a3] = iso[i][iA2]?.toLowerCase() || null;
+}
+// Không có trong ISO 3166-1 chính thức
+const A2_FIX = { XKX: "xk" };
 
 const enc = {
   "visa required": "R", "visa on arrival": "O", "e-visa": "E",
@@ -64,8 +74,15 @@ for (let i = 0; i < rowsIso.length; i++) {
 
 const nations = Object.keys(matrix)
   .sort()
-  .map((code) => ({ code, name: dispName[code] || isoName[code] || code }))
+  .map((code) => ({
+    code,
+    name: dispName[code] || isoName[code] || code,
+    a2: A2_FIX[code] || isoA2[code] || null,
+  }))
   .sort((a, b) => a.name.localeCompare(b.name));
+
+const noFlag = nations.filter((n) => !n.a2).map((n) => n.code);
+if (noFlag.length) console.warn("⚠ thiếu alpha-2 (không có cờ):", noFlag.join(", "));
 
 const out = new URL("../data/", import.meta.url);
 fs.writeFileSync(new URL("requirements.json", out), JSON.stringify(matrix));

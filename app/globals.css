@@ -166,6 +166,19 @@ svg.map path.sel { stroke: var(--ink); stroke-width: 1.6; }
 .tip { max-width: 260px; }
 .sw { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; display: inline-block; }
 
+/* ---------- cờ ---------- */
+.flag-img {
+  display: inline-block; vertical-align: -2px; flex-shrink: 0;
+  width: 20px; height: 15px; object-fit: cover;
+  border-radius: 2px; border: 1px solid var(--line-strong);
+  background: var(--surface-2);
+}
+.flag-img.flag-lg { width: 28px; height: 21px; vertical-align: -4px; }
+.passport .flag-img.flag-lg { width: 30px; height: 22px; }
+.cell-nation { display: inline-flex; align-items: center; gap: 9px; }
+.verdict-name { display: flex; align-items: center; gap: 10px; }
+.tip .n { display: flex; align-items: center; gap: 7px; }
+
 /* ---------- legend ---------- */
 .legend { display: flex; flex-direction: column; gap: 9px; }
 .legend-scale { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
