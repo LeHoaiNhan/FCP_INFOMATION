@@ -158,9 +158,22 @@ export default function PassportMap() {
       <div class="r"><span class="sw" style="background:var(${meta.v})"></span>${meta.label}${
         rich ? stay : ""
       }</div>${meta.note ? `<div class="note">${meta.note}</div>` : ""}`;
+
     const box = stage.getBoundingClientRect();
-    tip.style.left = `${cx - box.left}px`;
-    tip.style.top = `${cy - box.top}px`;
+    const px = cx - box.left;
+    const py = cy - box.top;
+    const tw = tip.offsetWidth;
+    const th = tip.offsetHeight;
+    const M = 6;
+    // canh giữa theo con trỏ, kẹp trong khung bản đồ
+    let left = px - tw / 2;
+    left = Math.max(M, Math.min(left, box.width - tw - M));
+    // mặc định hiện phía trên con trỏ; không đủ chỗ thì lật xuống dưới
+    let top = py - th - 14;
+    if (top < M) top = py + 18;
+    if (top + th > box.height - M) top = Math.max(M, box.height - th - M);
+    tip.style.left = `${left}px`;
+    tip.style.top = `${top}px`;
     tip.classList.add("on");
   }
   const hideTip = () => tipRef.current?.classList.remove("on");
