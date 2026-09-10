@@ -2,42 +2,44 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as RPointerEvent, MouseEvent as RMouseEvent } from "react";
-import type { Country } from "@/lib/countries";
-import { TIERS, ORDER, metaOf, type TierKey, type AnyTier } from "@/lib/tiers";
+import {
+  NATIONS,
+  destinationsFor,
+  passportName,
+  DEFAULT_PASSPORT,
+  type Destination,
+} from "@/lib/visa";
+import { TIERS, metaOf, type TierKey, type AnyTier } from "@/lib/tiers";
 
 const BASE = { x: 0, y: 0, w: 1000, h: 480 };
 
-export default function PassportMap({ countries }: { countries: Country[] }) {
-  const byName = useMemo(
-    () => new Map(countries.map((c) => [c.name, c])),
-    [countries],
+export default function PassportMap() {
+  const [passport, setPassport] = useState(DEFAULT_PASSPORT);
+  const [selected, setSelected] = useState("IND");
+  const [tierFilter, setTierFilter] = useState<TierKey | "">("");
+  const [view, setView] = useState<"map" | "table">("map");
+  const [query, setQuery] = useState("");
+
+  const destinations = useMemo(() => destinationsFor(passport), [passport]);
+  const byCode = useMemo(
+    () => new Map(destinations.map((d) => [d.code, d])),
+    [destinations],
   );
-  const tierOf = (name: string): AnyTier => byName.get(name)?.tier ?? "nodata";
+  const shaped = useMemo(
+    () => destinations.filter((d) => d.d !== null),
+    [destinations],
+  );
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const co of countries) c[co.tier] = (c[co.tier] ?? 0) + 1;
+    for (const d of destinations) {
+      if (d.tier === "home") continue;
+      c[d.tier] = (c[d.tier] ?? 0) + 1;
+    }
     return c;
-  }, [countries]);
+  }, [destinations]);
 
-  const rows = useMemo(
-    () =>
-      countries
-        .filter((c) => c.tier !== "nodata" && c.tier !== "home")
-        .sort(
-          (a, b) =>
-            (ORDER[a.tier] ?? 0) - (ORDER[b.tier] ?? 0) ||
-            a.name.localeCompare(b.name),
-        ),
-    [countries],
-  );
-
-  const [selected, setSelected] = useState("India");
-  const [filter, setFilter] = useState<TierKey | null>(null);
-  const [view, setView] = useState<"map" | "table">("map");
-  const [query, setQuery] = useState("");
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const tierOf = (code: string): AnyTier => byCode.get(code)?.tier ?? "nodata";
 
   const svgRef = useRef<SVGSVGElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -56,16 +58,9 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
 
   function clampVB() {
     const v = vb.current;
-    v.x = Math.max(
-      BASE.x - v.w * 0.15,
-      Math.min(BASE.w - v.w + v.w * 0.15, v.x),
-    );
-    v.y = Math.max(
-      BASE.y - v.h * 0.15,
-      Math.min(BASE.h - v.h + v.h * 0.15, v.y),
-    );
+    v.x = Math.max(BASE.x - v.w * 0.15, Math.min(BASE.w - v.w + v.w * 0.15, v.x));
+    v.y = Math.max(BASE.y - v.h * 0.15, Math.min(BASE.h - v.h + v.h * 0.15, v.y));
   }
-
   function zoom(f: number) {
     const v = vb.current;
     const cx = v.x + v.w / 2;
@@ -81,48 +76,41 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
     applyVB();
   }
 
-  function pathNameAt(target: EventTarget): string | null {
+  function codeAt(target: EventTarget): string | null {
     const el = (target as Element)?.closest?.("path");
-    return el?.getAttribute("data-name") ?? null;
+    return el?.getAttribute("data-code") ?? null;
   }
 
-  function showTip(name: string, cx: number, cy: number) {
+  function showTip(code: string, cx: number, cy: number) {
     const tip = tipRef.current;
     const stage = stageRef.current;
     if (!tip || !stage) return;
-    const t = tierOf(name);
-    const meta = metaOf(t);
-    const co = byName.get(name);
-    const stay = co?.stay ? `${co.stay} ngày` : "—";
-    const rich = t !== "nodata" && t !== "home";
-    tip.innerHTML = `<div class="n">${name}</div>
+    const d = byCode.get(code);
+    if (!d) return;
+    const meta = metaOf(d.tier);
+    const rich = d.tier !== "nodata" && d.tier !== "home";
+    const stay = d.stay ? ` · ${d.stay} ngày` : "";
+    tip.innerHTML = `<div class="n">${d.name}</div>
       <div class="r"><span class="sw" style="background:var(${meta.v})"></span>${meta.label}${
-        rich ? ` · ${stay}` : ""
+        rich ? stay : ""
       }</div>`;
     const box = stage.getBoundingClientRect();
     tip.style.left = `${cx - box.left}px`;
     tip.style.top = `${cy - box.top}px`;
     tip.classList.add("on");
   }
-  function hideTip() {
-    tipRef.current?.classList.remove("on");
-  }
+  const hideTip = () => tipRef.current?.classList.remove("on");
 
   function onPointerDown(e: RPointerEvent<SVGSVGElement>) {
-    drag.current = {
-      x: e.clientX,
-      y: e.clientY,
-      vx: vb.current.x,
-      vy: vb.current.y,
-    };
+    drag.current = { x: e.clientX, y: e.clientY, vx: vb.current.x, vy: vb.current.y };
     moved.current = 0;
     svgRef.current?.classList.add("dragging");
     svgRef.current?.setPointerCapture(e.pointerId);
   }
   function onPointerMove(e: RPointerEvent<SVGSVGElement>) {
     if (!drag.current) {
-      const name = pathNameAt(e.target);
-      if (name) showTip(name, e.clientX, e.clientY);
+      const code = codeAt(e.target);
+      if (code) showTip(code, e.clientX, e.clientY);
       else hideTip();
       return;
     }
@@ -141,83 +129,65 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
     clampVB();
     applyVB();
   }
-  function endDrag() {
+  const endDrag = () => {
     drag.current = null;
     svgRef.current?.classList.remove("dragging");
-  }
+  };
   function onClick(e: RMouseEvent<SVGSVGElement>) {
     if (moved.current > 5) return;
-    const name = pathNameAt(e.target);
-    if (name && tierOf(name) !== "nodata") setSelected(name);
+    const code = codeAt(e.target);
+    if (code && tierOf(code) !== "nodata") setSelected(code);
   }
 
-  function toggleFilter(k: TierKey) {
-    setFilter((cur) => (cur === k ? null : k));
-  }
-
-  function pickCountry(name: string) {
-    setSelected(name);
-    setView("map");
-  }
-
-  // Các path chỉ dựng lại khi countries / selected / filter đổi.
+  // path list — dựng lại khi hộ chiếu / điểm chọn / bộ lọc đổi
   const paths = useMemo(
     () =>
-      countries.map((c) => {
-        const meta = metaOf(c.tier);
+      shaped.map((d) => {
+        const meta = metaOf(d.tier);
         const cls = [
           meta.cls,
-          c.tier !== "nodata" ? "hit" : "",
-          filter && c.tier !== filter ? "dim" : "",
-          selected === c.name ? "sel" : "",
+          d.tier !== "nodata" ? "hit" : "",
+          tierFilter && d.tier !== tierFilter ? "dim" : "",
+          selected === d.code ? "sel" : "",
         ]
           .filter(Boolean)
           .join(" ");
         return (
-          <path key={c.id + c.name} d={c.d} className={cls} data-name={c.name} />
+          <path key={d.code} d={d.d as string} className={cls} data-code={d.code} />
         );
       }),
-    [countries, selected, filter],
+    [shaped, selected, tierFilter],
   );
 
-  const sel = byName.get(selected);
-  const selTier: AnyTier = sel?.tier ?? "nodata";
-  const selMeta = metaOf(selTier);
-
-  const fee =
-    sel?.fee == null ? "—" : sel.fee === 0 ? "Miễn phí" : String(sel.fee);
+  const sel: Destination | undefined = byCode.get(selected);
+  const selMeta = metaOf(sel?.tier ?? "nodata");
   const stay = sel?.stay == null ? "—" : String(sel.stay);
-  const proc = sel?.processing == null ? "—" : String(sel.processing);
 
-  const total = rows.length;
+  const total = destinations.filter(
+    (d) => d.tier !== "home" && d.tier !== "nodata",
+  ).length;
   const noPaper =
-    (counts.free ?? 0) +
-    (counts.eta ?? 0) +
-    (counts.evisa ?? 0) +
-    (counts.voa ?? 0);
+    (counts.free ?? 0) + (counts.eta ?? 0) + (counts.evisa ?? 0) + (counts.voa ?? 0);
   const pct = total ? Math.round((noPaper / total) * 100) : 0;
 
-  const tableRows = rows.filter(
-    (c) =>
-      !query.trim() ||
-      c.name.toLowerCase().includes(query.trim().toLowerCase()),
-  );
+  const tableRows = destinations.filter((d) => {
+    if (d.tier === "home") return false;
+    if (tierFilter && d.tier !== tierFilter) return false;
+    const q = query.trim().toLowerCase();
+    return !q || d.name.toLowerCase().includes(q);
+  });
 
-  const mrz = mounted
-    ? (() => {
-        const pad = (s: string, n: number) =>
-          (s + "<".repeat(n)).slice(0, n);
-        const date = new Date()
-          .toISOString()
-          .slice(2, 10)
-          .replace(/-/g, "");
-        return (
-          "P<VNMBAN<DO<THI<THUC<<DU<LIEU<MAU<<<<<<<<<<<<\n" +
-          pad(`0000000000VNM${date}M`, 30) +
-          `${total}QUOCGIA<${TIERS.length}MUC<<`
-        );
-      })()
-    : " ";
+  const mrz = (() => {
+    const pad = (s: string, n: number) => (s + "<".repeat(n)).slice(0, n);
+    const date = new Date().toISOString().slice(2, 10).replace(/-/g, "");
+    const nm = passportName(passport).toUpperCase().replace(/[^A-Z]+/g, "<");
+    return (
+      `P<${passport}${nm}${"<".repeat(44)}`.slice(0, 44) +
+      "\n" +
+      pad(`0000000000${passport}${date}M`, 30) +
+      `${total}DIEMDEN<${TIERS.length}MUC<<`
+    );
+  })();
 
   return (
     <div className="wrap">
@@ -225,79 +195,109 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
         <div className="head-top">
           <div>
             <div className="eyebrow">
-              Bản đồ chính sách nhập cảnh · {countries.length} quốc gia &amp;
-              vùng lãnh thổ
+              Bản đồ chính sách nhập cảnh · {NATIONS.length} hộ chiếu ×{" "}
+              {NATIONS.length} điểm đến
             </div>
-            <h1>Hộ chiếu Việt Nam đi đâu?</h1>
+            <h1>Hộ chiếu {passportName(passport)} đi đâu?</h1>
             <p className="sub">
-              Mỗi quốc gia được tô theo <strong>mức thủ tục</strong> bạn phải làm
-              trước chuyến đi — từ miễn thị thực đến phải xin visa tại đại sứ
-              quán. Bấm vào một nước để xem chi tiết.
+              Mỗi nước được tô theo <strong>mức thủ tục</strong> hộ chiếu này phải
+              làm trước chuyến đi — từ miễn thị thực đến phải xin visa tại đại sứ
+              quán. Đổi hộ chiếu ở thanh công cụ; bấm một nước để xem chi tiết.
             </p>
           </div>
           <div className="passport">
             <span className="flag" aria-hidden="true">
-              🇻🇳
+              🛂
             </span>
             <span>
-              <span className="code">P&lt;VNM</span>
-              <span className="cap">Hộ chiếu phổ thông</span>
+              <span className="code">P&lt;{passport}</span>
+              <span className="cap">{passportName(passport)}</span>
             </span>
           </div>
         </div>
 
         <div className="notice">
           <span className="icn" aria-hidden="true">
-            [!]
+            [i]
           </span>
           <span>
-            <b>Đây là dữ liệu mẫu để minh hoạ giao diện.</b> Các con số phí, thời
-            hạn lưu trú và thời gian xử lý chưa được đối chiếu với nguồn chính
-            thức và <b>không dùng để ra quyết định đi lại</b>. Bản chạy thật cần
-            gắn <span className="mono">officialUrl</span> +{" "}
-            <span className="mono">lastVerified</span> cho từng dòng.
+            Nguồn: <b>Passport Index Dataset</b> (ilyankou, giấy phép MIT) — tổng
+            hợp thông tin công khai, cập nhật vài lần mỗi năm,{" "}
+            <b>không phải real-time</b>. Lệ phí và thời gian xử lý dataset không
+            có. Bản chạy thật cần gắn <span className="mono">officialUrl</span> +{" "}
+            <span className="mono">lastVerified</span> cho từng dòng và đối chiếu
+            cổng chính thức của nước đến.
           </span>
         </div>
       </header>
 
       <div className="toolbar">
-        <div className="search">
-          <span className="mag" aria-hidden="true">
-            ⌕
-          </span>
-          <input
-            id="q"
-            type="search"
-            placeholder="Tìm quốc gia…"
-            autoComplete="off"
-            list="countries"
-            value={query}
-            onChange={(e) => {
-              const v = e.target.value;
-              setQuery(v);
-              const hit = rows.find(
-                (c) => c.name.toLowerCase() === v.trim().toLowerCase(),
-              );
-              if (hit) setSelected(hit.name);
-            }}
-          />
-          <datalist id="countries">
-            {rows.map((c) => (
-              <option key={c.id} value={c.name} />
-            ))}
-          </datalist>
-        </div>
-        <div className="seg" role="group" aria-label="Chế độ xem">
-          <button
-            aria-pressed={view === "map"}
-            onClick={() => setView("map")}
+        <label className="field">
+          <span className="field-lbl">Hộ chiếu</span>
+          <select
+            value={passport}
+            onChange={(e) => setPassport(e.target.value)}
           >
+            {NATIONS.map((n) => (
+              <option key={n.code} value={n.code}>
+                {n.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="field">
+          <span className="field-lbl">Nước đến</span>
+          <div className="search">
+            <span className="mag" aria-hidden="true">
+              ⌕
+            </span>
+            <input
+              type="search"
+              placeholder="Tìm nước đến…"
+              aria-label="Tìm nước đến"
+              autoComplete="off"
+              list="destinations"
+              value={query}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQuery(v);
+                const hit = destinations.find(
+                  (d) => d.name.toLowerCase() === v.trim().toLowerCase(),
+                );
+                if (hit) setSelected(hit.code);
+              }}
+            />
+            <datalist id="destinations">
+              {destinations
+                .filter((d) => d.tier !== "home")
+                .map((d) => (
+                  <option key={d.code} value={d.name} />
+                ))}
+            </datalist>
+          </div>
+        </label>
+
+        <label className="field">
+          <span className="field-lbl">Loại visa</span>
+          <select
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value as TierKey | "")}
+          >
+            <option value="">Tất cả</option>
+            {TIERS.map((t) => (
+              <option key={t.k} value={t.k}>
+                {t.short}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="seg" role="group" aria-label="Chế độ xem">
+          <button aria-pressed={view === "map"} onClick={() => setView("map")}>
             Bản đồ
           </button>
-          <button
-            aria-pressed={view === "table"}
-            onClick={() => setView("table")}
-          >
+          <button aria-pressed={view === "table"} onClick={() => setView("table")}>
             Bảng
           </button>
         </div>
@@ -310,7 +310,9 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
             className="map"
             viewBox="0 0 1000 480"
             role="img"
-            aria-label="Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu Việt Nam. Bảng dữ liệu tương đương có ở chế độ xem Bảng."
+            aria-label={`Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu ${passportName(
+              passport,
+            )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
@@ -322,25 +324,13 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
           </svg>
           <div className="tip" ref={tipRef} aria-hidden="true" />
           <div className="zoom">
-            <button
-              title="Phóng to"
-              aria-label="Phóng to"
-              onClick={() => zoom(1 / 1.5)}
-            >
+            <button title="Phóng to" aria-label="Phóng to" onClick={() => zoom(1 / 1.5)}>
               +
             </button>
-            <button
-              title="Thu nhỏ"
-              aria-label="Thu nhỏ"
-              onClick={() => zoom(1.5)}
-            >
+            <button title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => zoom(1.5)}>
               −
             </button>
-            <button
-              title="Về mặc định"
-              aria-label="Về mặc định"
-              onClick={resetZoom}
-            >
+            <button title="Về mặc định" aria-label="Về mặc định" onClick={resetZoom}>
               ⌂
             </button>
           </div>
@@ -357,9 +347,9 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
           {TIERS.map((t) => (
             <button
               key={t.k}
-              className={`tier ${t.bar}${filter && filter !== t.k ? " off" : ""}`}
-              aria-pressed={filter === t.k}
-              onClick={() => toggleFilter(t.k)}
+              className={`tier ${t.bar}${tierFilter && tierFilter !== t.k ? " off" : ""}`}
+              aria-pressed={tierFilter === t.k}
+              onClick={() => setTierFilter((cur) => (cur === t.k ? "" : t.k))}
             >
               <span className="bar" />
               <span className="lbl">{t.label}</span>
@@ -377,7 +367,7 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
           <table>
             <thead>
               <tr>
-                <th scope="col">Quốc gia</th>
+                <th scope="col">Nước đến</th>
                 <th scope="col">Mức thủ tục</th>
                 <th scope="col">Lưu trú</th>
                 <th scope="col">Phí</th>
@@ -388,33 +378,30 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
               {tableRows.length === 0 ? (
                 <tr>
                   <td colSpan={5} style={{ color: "var(--muted)" }}>
-                    Không tìm thấy quốc gia nào khớp.
+                    Không có nước nào khớp bộ lọc.
                   </td>
                 </tr>
               ) : (
-                tableRows.map((c) => {
-                  const m = metaOf(c.tier);
+                tableRows.map((d) => {
+                  const m = metaOf(d.tier);
                   return (
-                    <tr key={c.id} onClick={() => pickCountry(c.name)}>
-                      <td>{c.name}</td>
+                    <tr
+                      key={d.code}
+                      onClick={() => {
+                        setSelected(d.code);
+                        setView("map");
+                      }}
+                    >
+                      <td>{d.name}</td>
                       <td>
                         <span className="pill">
-                          <span
-                            className="sw"
-                            style={{ background: `var(${m.v})` }}
-                          />
-                          {m.short ?? m.label}
+                          <span className="sw" style={{ background: `var(${m.v})` }} />
+                          {m.short}
                         </span>
                       </td>
-                      <td className="num">{c.stay ?? "—"}</td>
-                      <td className="num">
-                        {c.fee == null
-                          ? "—"
-                          : c.fee === 0
-                            ? "miễn phí"
-                            : `$${c.fee}`}
-                      </td>
-                      <td className="num">{c.processing ?? "—"}</td>
+                      <td className="num">{d.stay ?? "—"}</td>
+                      <td className="num">—</td>
+                      <td className="num">—</td>
                     </tr>
                   );
                 })
@@ -431,33 +418,29 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
             <li>
               <span className="num">{counts.free ?? 0}</span>
               <p>
-                <b>Miễn thị thực hoàn toàn.</b> Gần như toàn bộ nằm trong ASEAN —
-                vùng xanh nhạt duy nhất trên bản đồ tập trung quanh Đông Nam Á.
-              </p>
-            </li>
-            <li>
-              <span className="num">{counts.eta ?? 0}</span>
-              <p>
-                <b>Chỉ {counts.eta ?? 0} nơi dùng eTA</b> với hộ chiếu Việt Nam.
-                Đây là điểm hay bị nhầm nhất: eTA không phải visa, nó là{" "}
-                <em>cấp phép đi lại</em> và phần lớn quốc gia chỉ mở cho các hộ
-                chiếu vốn đã được miễn thị thực.
+                <b>Nước miễn thị thực</b> cho hộ chiếu {passportName(passport)} —
+                vào thẳng, không giấy tờ xin trước.
               </p>
             </li>
             <li>
               <span className="num">{counts.evisa ?? 0}</span>
               <p>
-                <b>Xin eVisa online.</b> Dải này trải khắp châu Phi, Trung Á và
-                Nam Á — nộp hồ sơ qua web, nhận file PDF, không cần đến đại sứ
-                quán.
+                <b>Nước cấp eVisa online.</b> Nộp hồ sơ qua web, nhận file PDF,
+                không cần đến đại sứ quán.
+              </p>
+            </li>
+            <li>
+              <span className="num">{counts.visa ?? 0}</span>
+              <p>
+                <b>Nước phải xin visa trước</b> — nộp hồ sơ trực tiếp tại đại sứ
+                quán hoặc trung tâm tiếp nhận.
               </p>
             </li>
             <li>
               <span className="num">{pct}%</span>
               <p>
-                <b>Số điểm đến làm được thủ tục không cần đến đại sứ quán</b>,
-                tính cả bốn mức đầu. Phần còn lại — mảng xanh đậm phủ châu Âu, Bắc
-                Mỹ và Đông Á — vẫn phải nộp hồ sơ trực tiếp.
+                <b>Điểm đến làm được thủ tục không cần đến đại sứ quán</b> — tính
+                cả miễn thị thực, eTA, eVisa và cấp tại cửa khẩu.
               </p>
             </li>
           </ul>
@@ -466,14 +449,13 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
         <div className="panel verdict">
           <div className="verdict-head">
             <div>
-              <h2>{selected}</h2>
-              <div className="iso">ĐIỂM ĐẾN · TỪ P&lt;VNM</div>
+              <h2>{sel?.name ?? "—"}</h2>
+              <div className="iso">
+                HỘ CHIẾU {passport} → {selected}
+              </div>
             </div>
             <span className="badge">
-              <span
-                className="sw"
-                style={{ background: `var(${selMeta.v})` }}
-              />
+              <span className="sw" style={{ background: `var(${selMeta.v})` }} />
               {selMeta.label}
             </span>
           </div>
@@ -488,49 +470,38 @@ export default function PassportMap({ countries }: { countries: Country[] }) {
             <div className="fact">
               <dt>Lệ phí</dt>
               <dd>
-                {fee}
-                {sel?.fee != null && sel.fee > 0 && <small>USD</small>}
+                —<small>không có trong dataset</small>
               </dd>
             </div>
             <div className="fact">
               <dt>Thời gian xử lý</dt>
               <dd>
-                {proc}
-                {sel?.processing != null && <small>ngày làm việc</small>}
+                —<small>không có trong dataset</small>
               </dd>
             </div>
           </dl>
           <div className="src">
             <span>
-              Nguồn chính thức:{" "}
-              {sel?.officialUrl ? (
-                <a href={sel.officialUrl} target="_blank" rel="noreferrer">
-                  cổng cấp phép
-                </a>
-              ) : (
-                <span className="mono">chưa gắn</span>
-              )}
+              Nguồn chính thức: <span className="mono">chưa gắn</span>
             </span>
             <span>
-              Kiểm chứng lần cuối:{" "}
-              <span className="mono">{sel?.lastVerified ?? "—"}</span>
+              Kiểm chứng lần cuối: <span className="mono">—</span>
             </span>
           </div>
         </div>
       </div>
 
       <footer>
-        <div className="mrz">{mrz}</div>
+        <div className="mrz" suppressHydrationWarning>
+          {mrz}
+        </div>
         <p className="foot-note">
-          Phép chiếu <strong>Equal Earth</strong> — bảo toàn tỷ lệ diện tích, nên
-          một nước lớn trên hình đúng là một nước lớn (khác với Mercator vốn thổi
-          phồng vùng gần cực). Thang màu dùng{" "}
-          <strong>một tông xanh, đậm dần theo mức thủ tục</strong>: vì thứ bậc
-          được mã hoá bằng độ sáng chứ không bằng sắc màu, bản đồ vẫn đọc được với
-          người mù màu và khi in đen trắng. Nam Cực được lược bỏ. Ở độ phân giải
-          110m này, các quốc gia siêu nhỏ (Singapore, Bahrain, Maldives, Malta…)
-          không có hình đa giác — bản chạy thật cần dùng hình học 50m kèm điểm
-          đánh dấu cho nhóm đó.
+          Phép chiếu <strong>Equal Earth</strong> — bảo toàn tỷ lệ diện tích. Thang
+          màu dùng <strong>một tông xanh, đậm dần theo mức thủ tục</strong>: thứ
+          bậc mã hoá bằng độ sáng chứ không bằng sắc màu, nên bản đồ vẫn đọc được
+          với người mù màu và khi in đen trắng. Ở độ phân giải 110m, các nước siêu
+          nhỏ (Singapore, Bahrain, Maldives, Malta…) không có hình đa giác — vẫn
+          có trong bảng và ô tìm kiếm.
         </p>
       </footer>
     </div>

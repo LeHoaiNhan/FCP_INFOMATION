@@ -8,7 +8,7 @@
   --bg: #f4f6f9; --surface: #ffffff; --surface-2: #eceff4; --surface-3: #e2e7ee;
   --ink: #0f1620; --ink-2: #515c6b; --muted: #8791a0;
   --line: #dde2ea; --line-strong: #c3cbd6;
-  --ocean: #e8ecf2; --nodata: #cfd6e0; --home-fill: #b9c2ce;
+  --ocean: #e8ecf2; --nodata: #cfd6e0; --home-fill: #b9c2ce; --noadmission: #b5555f;
   --t1: #86b6ef; --t2: #5598e7; --t3: #2a78d6; --t4: #1c5cab; --t5: #0d366b;
   --sep: #ffffff;
   --focus: #2a78d6;
@@ -38,7 +38,7 @@
   --bg: #0b0e13; --surface: #141920; --surface-2: #1b212a; --surface-3: #232a35;
   --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
   --line: #252c37; --line-strong: #39424f;
-  --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f;
+  --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #7a3b42;
   --t1: #184f95; --t2: #256abf; --t3: #3987e5; --t4: #6da7ec; --t5: #9ec5f4;
   --sep: #0b0e13;
   --focus: #6da7ec;
@@ -90,8 +90,8 @@ h1 { font-size: clamp(28px, 4.4vw, 42px); font-weight: 700; line-height: 1.05; }
 .notice .icn { color: var(--muted); font-family: var(--mono); font-weight: 500; flex-shrink: 0; }
 
 /* ---------- toolbar ---------- */
-.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.search { position: relative; flex: 1 1 240px; max-width: 340px; }
+.toolbar { display: flex; gap: 10px 12px; align-items: flex-end; flex-wrap: wrap; }
+.search { position: relative; flex: 1 1 200px; max-width: 300px; }
 .search input {
   width: 100%; padding: 9px 12px 9px 32px; font: inherit; font-size: 14px;
   background: var(--surface); color: var(--ink);
@@ -105,6 +105,23 @@ h1 { font-size: clamp(28px, 4.4vw, 42px); font-weight: 700; line-height: 1.05; }
   background: transparent; color: var(--ink-2); cursor: pointer;
 }
 .seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(15, 22, 32, .10); }
+
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field:has(.search) { flex: 1 1 200px; max-width: 320px; }
+.field .search { flex: 1 1 auto; max-width: none; width: 100%; }
+.field-lbl { font-family: var(--mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.field select,
+.toolbar select {
+  font: inherit; font-size: 14px; padding: 8px 30px 8px 11px; border-radius: 7px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong);
+  cursor: pointer; max-width: 240px;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: right 14px center, right 9px center;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+.field select:focus-visible, .toolbar select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* ---------- map ---------- */
 .mapcard {
@@ -125,6 +142,7 @@ svg.map path.sel { stroke: var(--ink); stroke-width: 1.6; }
 .t-free { fill: var(--t1); } .t-eta { fill: var(--t2); } .t-evisa { fill: var(--t3); }
 .t-voa { fill: var(--t4); } .t-visa { fill: var(--t5); }
 .t-nodata { fill: var(--nodata); } .t-home { fill: var(--home-fill); stroke: var(--ink); stroke-width: 1.2; }
+.t-noadmission { fill: var(--noadmission); }
 
 .zoom { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 1px; border-radius: 7px; overflow: hidden; border: 1px solid var(--line-strong); box-shadow: var(--shadow); }
 .zoom button {
