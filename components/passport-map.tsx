@@ -18,7 +18,8 @@ const BASE = { x: 0, y: 0, w: 1000, h: 480 };
 
 export default function PassportMap() {
   const [passport, setPassport] = useState(DEFAULT_PASSPORT);
-  const [selected, setSelected] = useState("IND");
+  /** mã nước đến đang xem chi tiết; "" = tất cả các nước */
+  const [selected, setSelected] = useState("");
   const [tierFilter, setTierFilter] = useState<TierKey | "">("");
   const [view, setView] = useState<"map" | "table">("map");
   /** true khi chọn một nước đến từ ô "Nước đến" → bản đồ chỉ sáng nước đó */
@@ -255,6 +256,7 @@ export default function PassportMap() {
 
   const tableRows = destinations.filter((d) => {
     if (d.tier === "home") return false;
+    if (selected && d.code !== selected) return false;
     if (tierFilter && d.tier !== tierFilter) return false;
     return true;
   });
@@ -434,6 +436,24 @@ export default function PassportMap() {
       </div>
 
       <div className="mapcard" hidden={view !== "table"}>
+        <div className="table-bar">
+          <span>
+            {tableRows.length} nước
+            {tierFilter && ` · ${metaOf(tierFilter).label}`}
+          </span>
+          {(selected || tierFilter) && (
+            <button
+              className="table-clear"
+              onClick={() => {
+                setSelected("");
+                setTierFilter("");
+                setFocused(false);
+              }}
+            >
+              Xoá lọc
+            </button>
+          )}
+        </div>
         <div className="tablewrap">
           <table>
             <thead>

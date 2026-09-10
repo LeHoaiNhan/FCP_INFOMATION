@@ -258,10 +258,20 @@ svg.map path.sel { stroke: var(--ink); stroke-width: 1.7; opacity: 1; }
 ul { margin: 0; padding: 0; }
 
 /* ---------- table ---------- */
-.tablewrap { overflow-x: auto; }
+.table-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 12px; border-bottom: 1px solid var(--line);
+  font-size: 12.5px; color: var(--ink-2);
+}
+.table-clear {
+  font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 6px;
+}
+.table-clear:hover { background: var(--surface-3); }
+.tablewrap { overflow: auto; max-height: min(440px, 60vh); overscroll-behavior: contain; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px; }
 th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); }
-th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+th { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); font-weight: 500; position: sticky; top: 0; z-index: 1; background: var(--surface); box-shadow: inset 0 -1px 0 var(--line); }
 td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink-2); }
 tbody tr:hover { background: var(--surface-2); }
 tbody tr { cursor: pointer; }
