@@ -126,6 +126,16 @@ export default function PassportMap() {
     resetZoom();
   }
 
+  function chooseDestination(code: string) {
+    if (code) {
+      pickDestination(code);
+    } else {
+      setSelected("");
+      setFocused(false);
+      resetZoom();
+    }
+  }
+
   function codeAt(target: EventTarget): string | null {
     const el = (target as Element)?.closest?.("path");
     return el?.getAttribute("data-code") ?? null;
@@ -201,13 +211,13 @@ export default function PassportMap() {
     () =>
       shaped.map((d) => {
         const meta = metaOf(d.tier);
-        const dim =
-          (!!tierFilter && d.tier !== tierFilter) ||
-          (focused && d.code !== selected);
+        // Khi soi 1 nước: các nước khác về xám, không hiện màu mức.
+        const focusBg = focused && d.code !== selected;
+        const tierDim = !focusBg && !!tierFilter && d.tier !== tierFilter;
         const cls = [
-          meta.cls,
+          focusBg ? "t-focusbg" : meta.cls,
           d.tier !== "nodata" ? "hit" : "",
-          dim ? "dim" : "",
+          tierDim ? "dim" : "",
           selected === d.code ? "sel" : "",
         ]
           .filter(Boolean)
@@ -241,6 +251,10 @@ export default function PassportMap() {
     label: n.name,
     flag: flagSrc(n.a2),
   }));
+  const destOptions: ComboOption[] = [
+    { value: "", label: "Tất cả các nước" },
+    ...nationOptions,
+  ];
   const visaOptions: ComboOption[] = [
     { value: "", label: "Tất cả loại visa", dot: "" },
     ...TIERS.map((t) => ({ value: t.k, label: t.label, dot: t.v })),
@@ -321,8 +335,8 @@ export default function PassportMap() {
         <Combobox
           label="Nước đến"
           value={selected}
-          options={nationOptions}
-          onChange={pickDestination}
+          options={destOptions}
+          onChange={chooseDestination}
           searchable
         />
         <Combobox
@@ -502,59 +516,100 @@ export default function PassportMap() {
         </div>
 
         <div className="panel verdict">
-          <div className="verdict-head">
-            <div>
-              <h2 className="verdict-name">
-                {flagSrc(sel?.a2) && (
-                  <img
-                    className="flag-img flag-lg"
-                    src={flagSrc(sel?.a2) as string}
-                    alt=""
-                    width={28}
-                    height={21}
-                  />
-                )}
-                {sel?.name ?? "—"}
-              </h2>
-              <div className="iso">
-                HỘ CHIẾU {passport} → {selected}
+          {sel ? (
+            <>
+              <div className="verdict-head">
+                <div>
+                  <h2 className="verdict-name">
+                    {flagSrc(sel.a2) && (
+                      <img
+                        className="flag-img flag-lg"
+                        src={flagSrc(sel.a2) as string}
+                        alt=""
+                        width={28}
+                        height={21}
+                      />
+                    )}
+                    {sel.name}
+                  </h2>
+                  <div className="iso">
+                    HỘ CHIẾU {passport} → {selected}
+                  </div>
+                </div>
+                <span className="badge">
+                  <span className="sw" style={{ background: `var(${selMeta.v})` }} />
+                  {selMeta.label}
+                </span>
               </div>
-            </div>
-            <span className="badge">
-              <span className="sw" style={{ background: `var(${selMeta.v})` }} />
-              {selMeta.label}
-            </span>
-          </div>
-          <dl className="facts">
-            <div className="fact">
-              <dt>Lưu trú tối đa</dt>
-              <dd>
-                {stay}
-                {sel?.stay != null && <small>ngày</small>}
-              </dd>
-            </div>
-            <div className="fact">
-              <dt>Lệ phí</dt>
-              <dd>
-                —<small>không có trong dataset</small>
-              </dd>
-            </div>
-            <div className="fact">
-              <dt>Thời gian xử lý</dt>
-              <dd>
-                —<small>không có trong dataset</small>
-              </dd>
-            </div>
-          </dl>
-          {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
-          <div className="src">
-            <span>
-              Nguồn chính thức: <span className="mono">chưa gắn</span>
-            </span>
-            <span>
-              Kiểm chứng lần cuối: <span className="mono">—</span>
-            </span>
-          </div>
+              <dl className="facts">
+                <div className="fact">
+                  <dt>Lưu trú tối đa</dt>
+                  <dd>
+                    {stay}
+                    {sel.stay != null && <small>ngày</small>}
+                  </dd>
+                </div>
+                <div className="fact">
+                  <dt>Lệ phí</dt>
+                  <dd>
+                    —<small>không có trong dataset</small>
+                  </dd>
+                </div>
+                <div className="fact">
+                  <dt>Thời gian xử lý</dt>
+                  <dd>
+                    —<small>không có trong dataset</small>
+                  </dd>
+                </div>
+              </dl>
+              {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
+              <div className="src">
+                <span>
+                  Nguồn chính thức: <span className="mono">chưa gắn</span>
+                </span>
+                <span>
+                  Kiểm chứng lần cuối: <span className="mono">—</span>
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="verdict-head">
+                <div>
+                  <h2 className="verdict-name">Tất cả {total} nước</h2>
+                  <div className="iso">HỘ CHIẾU {passport} → TỔNG QUAN</div>
+                </div>
+              </div>
+              <p className="verdict-note">
+                Chọn một nước ở ô <strong>Nước đến</strong> hoặc bấm thẳng trên
+                bản đồ để xem mức thủ tục cụ thể cho hộ chiếu{" "}
+                {passportName(passport)}.
+              </p>
+              <dl className="facts">
+                <div className="fact">
+                  <dt>Miễn thị thực</dt>
+                  <dd>
+                    {counts.free ?? 0}
+                    <small>nước</small>
+                  </dd>
+                </div>
+                <div className="fact">
+                  <dt>Làm online</dt>
+                  <dd>
+                    {(counts.eta ?? 0) + (counts.evisa ?? 0)}
+                    <small>nước</small>
+                  </dd>
+                </div>
+                <div className="fact">
+                  <dt>Visa tại ĐSQ</dt>
+                  <dd>
+                    {counts.visa ?? 0}
+                    <small>nước</small>
+                  </dd>
+                </div>
+              </dl>
+            </>
+          )}
         </div>
       </div>
 
