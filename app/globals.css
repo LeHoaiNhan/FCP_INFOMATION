@@ -20,31 +20,8 @@
   --mono: var(--font-mono), ui-monospace, Menlo, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:where(:not([data-theme="light"])) {
-    color-scheme: dark;
-    --bg: #0b0e13; --surface: #141920; --surface-2: #1b212a; --surface-3: #232a35;
-    --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
-    --line: #252c37; --line-strong: #39424f;
-    --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #b23b48;
-    --t1: #46b45c; --t2: #8fbdec; --t3: #3f7fd0; --t4: #e0954a; --t5: #e07782;
-    --sep: #0b0e13;
-    --focus: #6da7ec;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
-  }
-}
-
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #0b0e13; --surface: #141920; --surface-2: #1b212a; --surface-3: #232a35;
-  --ink: #f2f5f8; --ink-2: #a3adbb; --muted: #76808e;
-  --line: #252c37; --line-strong: #39424f;
-  --ocean: #0f141a; --nodata: #2a313c; --home-fill: #48525f; --noadmission: #b23b48;
-  --t1: #46b45c; --t2: #4a91e6; --t3: #93c3e8; --t4: #e0954a; --t5: #e07782;
-  --sep: #0b0e13;
-  --focus: #6da7ec;
-  --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px -12px rgba(0, 0, 0, .7);
-}
+/* Luôn dùng theme sáng — cố ý không đọc prefers-color-scheme, không có
+   nút đổi theme trong app này nên bỏ hẳn nhánh dark cho gọn. */
 
 * { box-sizing: border-box; }
 
