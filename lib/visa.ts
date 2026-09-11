@@ -64,17 +64,33 @@ export function isKnownPassport(code: string | null | undefined): boolean {
 
 /**
  * Toàn bộ 199 điểm đến cho một hộ chiếu, đã sắp theo mức thủ tục rồi theo tên.
+ * `passport === ""` = chưa chọn hộ chiếu cụ thể (lọc "Tất cả") — không có dữ
+ * liệu nào để tô màu, mọi điểm đến trả về mức "nodata".
  *
  * Hiện đọc từ ma trận tĩnh (passport-index-dataset). Khi chuyển sang Supabase,
  * thay bằng:  supabase.from("requirements").select().eq("passport", passport)
  * rồi map sang cùng kiểu `Destination` — UI không đổi.
  */
 export function destinationsFor(passport: string): Destination[] {
-  const row = MATRIX[passport] ?? MATRIX[DEFAULT_PASSPORT];
+  const row = passport ? (MATRIX[passport] ?? MATRIX[DEFAULT_PASSPORT]) : null;
   return NATIONS.map((n) => {
+    const shape = GEO_BY_ISO3[n.code];
+    if (!row) {
+      return {
+        code: n.code,
+        name: n.name,
+        a2: n.a2,
+        d: shape?.d ?? null,
+        tier: "nodata" as const,
+        stay: null,
+        fee: null,
+        processing: null,
+        officialUrl: null,
+        lastVerified: null,
+      };
+    }
     const raw = row[n.code] ?? "";
     const { tier, stay } = decodeRequirement(raw);
-    const shape = GEO_BY_ISO3[n.code];
     return {
       code: n.code,
       name: n.name,
@@ -95,6 +111,7 @@ export function destinationsFor(passport: string): Destination[] {
 }
 
 export function passportName(code: string): string {
+  if (!code) return "Tất cả";
   return NAME_BY_CODE[code] ?? code;
 }
 

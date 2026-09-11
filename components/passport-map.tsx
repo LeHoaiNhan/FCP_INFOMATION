@@ -224,7 +224,10 @@ export default function PassportMap({
   };
   function onClick(e: RMouseEvent<SVGSVGElement>) {
     if (moved.current > 5) return;
-    const code = codeAt(e.target);
+    // setPointerCapture (cho kéo-thả) khiến e.target luôn là <svg> gốc ở đây,
+    // nên phải dò lại phần tử thật dưới con trỏ bằng toạ độ.
+    const real = document.elementFromPoint(e.clientX, e.clientY);
+    const code = real && codeAt(real);
     if (code && tierOf(code) !== "nodata") {
       setSelected(code);
       setFocused(false);
@@ -277,6 +280,10 @@ export default function PassportMap({
     label: n.name,
     flag: flagSrc(n.a2),
   }));
+  const passportOptions: ComboOption[] = [
+    { value: "", label: "Tất cả các hộ chiếu" },
+    ...nationOptions,
+  ];
   const destOptions: ComboOption[] = [
     { value: "", label: "Tất cả các nước" },
     ...nationOptions,
@@ -299,62 +306,146 @@ export default function PassportMap({
   })();
 
   return (
-    <div className="wrap">
-      <header>
-        <div className="head-top">
-          <div>
-            <div className="eyebrow">
-              Bản đồ chính sách nhập cảnh · {NATIONS.length} hộ chiếu ×{" "}
-              {NATIONS.length} điểm đến
-            </div>
-            <h1>Hộ chiếu {passportName(passport)} đi đâu?</h1>
-            <p className="sub">
-              Mỗi nước được tô theo <strong>mức thủ tục</strong> hộ chiếu này phải
-              làm trước chuyến đi. Bấm một nước trên bản đồ để xem chi tiết, hoặc
-              chọn ở ô <strong>Nước đến</strong> để bản đồ soi riêng nước đó.
-            </p>
-          </div>
-          <div className="passport">
-            {passportFlag(passport) ? (
-              <img
-                className="flag-img flag-lg"
-                src={passportFlag(passport) as string}
-                alt=""
-                width={30}
-                height={22}
-              />
-            ) : (
-              <span className="flag" aria-hidden="true">
-                🛂
-              </span>
-            )}
+    <div className="mapapp">
+      <div className="mapapp-view">
+        <div className="mapapp-stage" ref={stageRef} hidden={view !== "map"}>
+          <svg
+            ref={svgRef}
+            className="map"
+            viewBox="0 0 1000 480"
+            role="img"
+            aria-label={`Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu ${passportName(
+              passport,
+            )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onPointerLeave={hideTip}
+            onClick={onClick}
+          >
+            {paths}
+          </svg>
+          <div className="tip" ref={tipRef} aria-hidden="true" />
+        </div>
+
+        <div className="mapapp-table" hidden={view !== "table"}>
+          <div className="table-bar">
             <span>
-              <span className="code">P&lt;{passport}</span>
-              <span className="cap">{passportName(passport)}</span>
+              {tableRows.length} nước
+              {tierFilter && ` · ${metaOf(tierFilter).label}`}
             </span>
+            {(selected || tierFilter) && (
+              <button
+                className="table-clear"
+                onClick={() => {
+                  setSelected("");
+                  setTierFilter("");
+                  setFocused(false);
+                }}
+              >
+                Xoá lọc
+              </button>
+            )}
+          </div>
+          <div className="tablewrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Nước đến</th>
+                  <th scope="col">Mức thủ tục</th>
+                  <th scope="col">Lưu trú</th>
+                  <th scope="col">Phí</th>
+                  <th scope="col">Xử lý</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ color: "var(--muted)" }}>
+                      Không có nước nào khớp bộ lọc.
+                    </td>
+                  </tr>
+                ) : (
+                  tableRows.map((d) => {
+                    const m = metaOf(d.tier);
+                    return (
+                      <tr
+                        key={d.code}
+                        className={d.code === selected ? "row-sel" : undefined}
+                        onClick={() => pickDestination(d.code)}
+                      >
+                        <td>
+                          <span className="cell-nation">
+                            {flagSrc(d.a2) && (
+                              <img
+                                className="flag-img"
+                                src={flagSrc(d.a2) as string}
+                                alt=""
+                                width={20}
+                                height={15}
+                              />
+                            )}
+                            {d.name}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="pill">
+                            <span className="sw" style={{ background: `var(${m.v})` }} />
+                            {m.short}
+                          </span>
+                        </td>
+                        <td className="num">{d.stay ?? "—"}</td>
+                        <td className="num">—</td>
+                        <td className="num">—</td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="notice">
-          <span className="icn" aria-hidden="true">
-            [i]
-          </span>
+        {view === "map" && (
+          <div className="zoom mapapp-zoom">
+            <button title="Phóng to" aria-label="Phóng to" onClick={() => zoom(1 / 1.5)}>
+              +
+            </button>
+            <button title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => zoom(1.5)}>
+              −
+            </button>
+            <button title="Về mặc định" aria-label="Về mặc định" onClick={resetZoom}>
+              ⌂
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="mapapp-toolbar">
+        <div className="passport">
+          {passportFlag(passport) ? (
+            <img
+              className="flag-img flag-lg"
+              src={passportFlag(passport) as string}
+              alt=""
+              width={30}
+              height={22}
+            />
+          ) : (
+            <span className="flag" aria-hidden="true">
+              {passport ? "🛂" : "🌐"}
+            </span>
+          )}
           <span>
-            Nguồn: <b>Passport Index Dataset</b> (ilyankou, giấy phép MIT) — tổng
-            hợp thông tin công khai, cập nhật vài lần mỗi năm,{" "}
-            <b>không phải real-time</b>. Lệ phí và thời gian xử lý dataset không
-            có. Bản chạy thật cần gắn <span className="mono">officialUrl</span> +{" "}
-            <span className="mono">lastVerified</span> cho từng dòng và đối chiếu
-            cổng chính thức của nước đến.
+            <span className="code">{passport ? `P<${passport}` : "TẤT CẢ"}</span>
+            <span className="cap">{passportName(passport)}</span>
           </span>
         </div>
-      </header>
-
-      <div className="toolbar">
         <Combobox
           label="Hộ chiếu"
           value={passport}
-          options={nationOptions}
+          options={passportOptions}
           onChange={setPassport}
           searchable
         />
@@ -380,152 +471,160 @@ export default function PassportMap({
             Bảng
           </button>
         </div>
+
+        {focused && (
+          <button className="focus-clear" onClick={clearFocus}>
+            ← Hiện tất cả các nước
+          </button>
+        )}
       </div>
 
-      <div className="mapcard" hidden={view !== "map"}>
-        <div className="mapstage" ref={stageRef}>
-          <svg
-            ref={svgRef}
-            className="map"
-            viewBox="0 0 1000 480"
-            role="img"
-            aria-label={`Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu ${passportName(
-              passport,
-            )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endDrag}
-            onPointerCancel={endDrag}
-            onPointerLeave={hideTip}
-            onClick={onClick}
-          >
-            {paths}
-          </svg>
-          <div className="tip" ref={tipRef} aria-hidden="true" />
-          {focused && (
-            <button className="focus-clear" onClick={clearFocus}>
-              ← Hiện tất cả các nước
-            </button>
-          )}
-          <div className="zoom">
-            <button title="Phóng to" aria-label="Phóng to" onClick={() => zoom(1 / 1.5)}>
-              +
-            </button>
-            <button title="Thu nhỏ" aria-label="Thu nhỏ" onClick={() => zoom(1.5)}>
-              −
-            </button>
-            <button title="Về mặc định" aria-label="Về mặc định" onClick={resetZoom}>
-              ⌂
-            </button>
+      {view === "map" && (
+        <div className="mapapp-legend">
+          <div className="legend-scale">
+            <span className="eyebrow">Thang thứ bậc · bấm để lọc</span>
+          </div>
+          <div className="tiers">
+            {TIERS.map((t) => (
+              <button
+                key={t.k}
+                className={`tier ${t.bar}${tierFilter && tierFilter !== t.k ? " off" : ""}`}
+                aria-pressed={tierFilter === t.k}
+                onClick={() => setTierFilter((cur) => (cur === t.k ? "" : t.k))}
+              >
+                <span className="bar" />
+                <span className="lbl">{t.label}</span>
+                <span className="cnt">
+                  {counts[t.k] ?? 0}
+                  <em>nước</em>
+                </span>
+              </button>
+            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="legend">
-        <div className="legend-scale">
-          <span>← Ít thủ tục hơn</span>
-          <span className="eyebrow">Thang thứ bậc · bấm để lọc</span>
-          <span>Nhiều thủ tục hơn →</span>
+      <div className="mapapp-panel">
+        <div className="panel-head">
+          <div className="eyebrow">
+            Bản đồ chính sách nhập cảnh · {NATIONS.length} hộ chiếu ×{" "}
+            {NATIONS.length} điểm đến
+          </div>
+          <h1 className="panel-title">
+            {passport ? `Hộ chiếu ${passportName(passport)} đi đâu?` : "Tất cả hộ chiếu đi đâu?"}
+          </h1>
         </div>
-        <div className="tiers">
-          {TIERS.map((t) => (
-            <button
-              key={t.k}
-              className={`tier ${t.bar}${tierFilter && tierFilter !== t.k ? " off" : ""}`}
-              aria-pressed={tierFilter === t.k}
-              onClick={() => setTierFilter((cur) => (cur === t.k ? "" : t.k))}
-            >
-              <span className="bar" />
-              <span className="lbl">{t.label}</span>
-              <span className="cnt">
-                {counts[t.k] ?? 0}
-                <em>nước</em>
+
+        {!passport ? (
+          <>
+            <div className="verdict-head">
+              <div>
+                <h2 className="verdict-name">Chưa chọn hộ chiếu</h2>
+                <div className="iso">HỘ CHIẾU TẤT CẢ → TỔNG QUAN</div>
+              </div>
+            </div>
+            <p className="verdict-note">
+              Mỗi hộ chiếu có mức thủ tục khác nhau ở từng nước, nên khi để{" "}
+              <strong>Hộ chiếu</strong> là &quot;tất cả&quot; thì bản đồ không
+              có gì để tô màu. Chọn một hộ chiếu cụ thể để xem chi tiết.
+            </p>
+          </>
+        ) : sel ? (
+          <>
+            <div className="verdict-head">
+              <div>
+                <h2 className="verdict-name">
+                  {flagSrc(sel.a2) && (
+                    <img
+                      className="flag-img flag-lg"
+                      src={flagSrc(sel.a2) as string}
+                      alt=""
+                      width={28}
+                      height={21}
+                    />
+                  )}
+                  {sel.name}
+                </h2>
+                <div className="iso">
+                  HỘ CHIẾU {passport} → {selected}
+                </div>
+              </div>
+              <span className="badge">
+                <span className="sw" style={{ background: `var(${selMeta.v})` }} />
+                {selMeta.label}
               </span>
-            </button>
-          ))}
-        </div>
-      </div>
+            </div>
+            <dl className="facts">
+              <div className="fact">
+                <dt>Lưu trú tối đa</dt>
+                <dd>
+                  {stay}
+                  {sel.stay != null && <small>ngày</small>}
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Lệ phí</dt>
+                <dd>
+                  —<small>không có trong dataset</small>
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Thời gian xử lý</dt>
+                <dd>
+                  —<small>không có trong dataset</small>
+                </dd>
+              </div>
+            </dl>
+            {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
+            <div className="src">
+              <span>
+                Nguồn chính thức: <span className="mono">chưa gắn</span>
+              </span>
+              <span>
+                Kiểm chứng lần cuối: <span className="mono">—</span>
+              </span>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="verdict-head">
+              <div>
+                <h2 className="verdict-name">Tất cả {total} nước</h2>
+                <div className="iso">HỘ CHIẾU {passport} → TỔNG QUAN</div>
+              </div>
+            </div>
+            <p className="verdict-note">
+              Chọn một nước ở ô <strong>Nước đến</strong> hoặc bấm thẳng trên
+              bản đồ để xem mức thủ tục cụ thể cho hộ chiếu{" "}
+              {passportName(passport)}.
+            </p>
+            <dl className="facts">
+              <div className="fact">
+                <dt>Miễn thị thực</dt>
+                <dd>
+                  {counts.free ?? 0}
+                  <small>nước</small>
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Làm online</dt>
+                <dd>
+                  {(counts.eta ?? 0) + (counts.evisa ?? 0)}
+                  <small>nước</small>
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Visa tại ĐSQ</dt>
+                <dd>
+                  {counts.visa ?? 0}
+                  <small>nước</small>
+                </dd>
+              </div>
+            </dl>
+          </>
+        )}
 
-      <div className="mapcard" hidden={view !== "table"}>
-        <div className="table-bar">
-          <span>
-            {tableRows.length} nước
-            {tierFilter && ` · ${metaOf(tierFilter).label}`}
-          </span>
-          {(selected || tierFilter) && (
-            <button
-              className="table-clear"
-              onClick={() => {
-                setSelected("");
-                setTierFilter("");
-                setFocused(false);
-              }}
-            >
-              Xoá lọc
-            </button>
-          )}
-        </div>
-        <div className="tablewrap">
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Nước đến</th>
-                <th scope="col">Mức thủ tục</th>
-                <th scope="col">Lưu trú</th>
-                <th scope="col">Phí</th>
-                <th scope="col">Xử lý</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tableRows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} style={{ color: "var(--muted)" }}>
-                    Không có nước nào khớp bộ lọc.
-                  </td>
-                </tr>
-              ) : (
-                tableRows.map((d) => {
-                  const m = metaOf(d.tier);
-                  return (
-                    <tr
-                      key={d.code}
-                      className={d.code === selected ? "row-sel" : undefined}
-                      onClick={() => pickDestination(d.code)}
-                    >
-                      <td>
-                        <span className="cell-nation">
-                          {flagSrc(d.a2) && (
-                            <img
-                              className="flag-img"
-                              src={flagSrc(d.a2) as string}
-                              alt=""
-                              width={20}
-                              height={15}
-                            />
-                          )}
-                          {d.name}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="pill">
-                          <span className="sw" style={{ background: `var(${m.v})` }} />
-                          {m.short}
-                        </span>
-                      </td>
-                      <td className="num">{d.stay ?? "—"}</td>
-                      <td className="num">—</td>
-                      <td className="num">—</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="lower">
-        <div className="panel insights">
+        <div className="panel-insights">
           <h3>Bản đồ này nói lên điều gì</h3>
           <ul className="ins">
             <li>
@@ -559,109 +658,24 @@ export default function PassportMap({
           </ul>
         </div>
 
-        <div className="panel verdict">
-          {sel ? (
-            <>
-              <div className="verdict-head">
-                <div>
-                  <h2 className="verdict-name">
-                    {flagSrc(sel.a2) && (
-                      <img
-                        className="flag-img flag-lg"
-                        src={flagSrc(sel.a2) as string}
-                        alt=""
-                        width={28}
-                        height={21}
-                      />
-                    )}
-                    {sel.name}
-                  </h2>
-                  <div className="iso">
-                    HỘ CHIẾU {passport} → {selected}
-                  </div>
-                </div>
-                <span className="badge">
-                  <span className="sw" style={{ background: `var(${selMeta.v})` }} />
-                  {selMeta.label}
-                </span>
-              </div>
-              <dl className="facts">
-                <div className="fact">
-                  <dt>Lưu trú tối đa</dt>
-                  <dd>
-                    {stay}
-                    {sel.stay != null && <small>ngày</small>}
-                  </dd>
-                </div>
-                <div className="fact">
-                  <dt>Lệ phí</dt>
-                  <dd>
-                    —<small>không có trong dataset</small>
-                  </dd>
-                </div>
-                <div className="fact">
-                  <dt>Thời gian xử lý</dt>
-                  <dd>
-                    —<small>không có trong dataset</small>
-                  </dd>
-                </div>
-              </dl>
-              {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
-              <div className="src">
-                <span>
-                  Nguồn chính thức: <span className="mono">chưa gắn</span>
-                </span>
-                <span>
-                  Kiểm chứng lần cuối: <span className="mono">—</span>
-                </span>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="verdict-head">
-                <div>
-                  <h2 className="verdict-name">Tất cả {total} nước</h2>
-                  <div className="iso">HỘ CHIẾU {passport} → TỔNG QUAN</div>
-                </div>
-              </div>
-              <p className="verdict-note">
-                Chọn một nước ở ô <strong>Nước đến</strong> hoặc bấm thẳng trên
-                bản đồ để xem mức thủ tục cụ thể cho hộ chiếu{" "}
-                {passportName(passport)}.
-              </p>
-              <dl className="facts">
-                <div className="fact">
-                  <dt>Miễn thị thực</dt>
-                  <dd>
-                    {counts.free ?? 0}
-                    <small>nước</small>
-                  </dd>
-                </div>
-                <div className="fact">
-                  <dt>Làm online</dt>
-                  <dd>
-                    {(counts.eta ?? 0) + (counts.evisa ?? 0)}
-                    <small>nước</small>
-                  </dd>
-                </div>
-                <div className="fact">
-                  <dt>Visa tại ĐSQ</dt>
-                  <dd>
-                    {counts.visa ?? 0}
-                    <small>nước</small>
-                  </dd>
-                </div>
-              </dl>
-            </>
-          )}
+        <div className="notice">
+          <span className="icn" aria-hidden="true">
+            [i]
+          </span>
+          <span>
+            Nguồn: <b>Passport Index Dataset</b> (ilyankou, giấy phép MIT) — tổng
+            hợp thông tin công khai, cập nhật vài lần mỗi năm,{" "}
+            <b>không phải real-time</b>. Lệ phí và thời gian xử lý dataset không
+            có. Bản chạy thật cần gắn <span className="mono">officialUrl</span> +{" "}
+            <span className="mono">lastVerified</span> cho từng dòng và đối chiếu
+            cổng chính thức của nước đến.
+          </span>
         </div>
-      </div>
 
-      <footer>
         <div className="mrz" suppressHydrationWarning>
           {mrz}
         </div>
-      </footer>
+      </div>
     </div>
   );
 }
