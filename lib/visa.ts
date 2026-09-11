@@ -1,6 +1,7 @@
 import geoRaw from "@/data/geo.json";
 import nationsRaw from "@/data/nations.json";
 import matrixRaw from "@/data/requirements.json";
+import coversRaw from "@/data/passport-covers.json";
 import { decodeRequirement, ORDER, type AnyTier } from "./tiers";
 
 /** Một nước / vùng lãnh thổ — dùng cho cả dropdown hộ chiếu và điểm đến. */
@@ -104,4 +105,19 @@ export function flagSrc(a2: string | null | undefined): string | null {
 
 export function passportFlag(code: string): string | null {
   return flagSrc(A2_BY_CODE[code]);
+}
+
+/** Mã hộ chiếu đang có ảnh bìa thật (nguồn: scripts/copy-passport-images.mjs). */
+export const PASSPORT_COVERS = new Set(coversRaw as string[]);
+
+export function hasPassportCover(code: string): boolean {
+  return PASSPORT_COVERS.has(code);
+}
+
+/** Đường dẫn ảnh bìa hộ chiếu trong /public, hoặc null nếu chưa có ảnh cho nước này. */
+export function passportCoverSrc(
+  code: string,
+  size: "thumb" | "full" = "full",
+): string | null {
+  return PASSPORT_COVERS.has(code) ? `/passports/${size}/${code}.png` : null;
 }

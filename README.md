@@ -27,12 +27,16 @@ npm run dev        # http://localhost:3000
 | Đường dẫn | Việc |
 |---|---|
 | `app/page.tsx` | Server component — render `<PassportMap />` |
-| `components/passport-map.tsx` | Client — bản đồ SVG: pan/zoom, hover, chọn nước, 3 bộ lọc, bảng, thẻ kết luận, dải MRZ |
-| `lib/visa.ts` | **Lớp dữ liệu duy nhất** — `destinationsFor(passport)`. Đổi sang Supabase ở đây |
+| `app/ho-chieu/page.tsx` | Server component — render `<PassportGallery />` |
+| `components/passport-map.tsx` | Client — bản đồ SVG: pan/zoom, hover, chọn nước, 3 bộ lọc, bảng, thẻ kết luận, dải MRZ. Nhận `passport`/`onPassportChange` để trang khác điều khiển được |
+| `components/passport-gallery.tsx` | Client — trang "Bộ sưu tập hộ chiếu" (`/ho-chieu`): giới thiệu 5 mức thủ tục, lưới ảnh bìa hộ chiếu (99 nước có ảnh) để chọn trực quan, nhúng `<PassportMap>` bên dưới |
+| `lib/visa.ts` | **Lớp dữ liệu duy nhất** — `destinationsFor(passport)`, `passportCoverSrc()`. Đổi sang Supabase ở đây |
 | `lib/tiers.ts` | 6 mức + thang màu + `decodeRequirement()` |
 | `data/requirements.json` | Ma trận 199×199, giá trị nén 1 ký tự (`R`/`O`/`E`/`T`/`F`/`N`/`H`/số ngày) |
 | `data/nations.json` | 199 nước `{code, name}` — dùng cho cả 2 dropdown |
 | `data/geo.json` | Hình học 176 nước (Natural Earth 110m, Equal Earth) + `iso3` |
+| `data/passport-covers.json` | Mã ISO3 của 99 nước đang có ảnh bìa hộ chiếu trong `public/passports/` |
+| `images_watermark/` · `scripts/copy-passport-images.mjs` | Ảnh bìa hộ chiếu gốc (có watermark vuvgo.com) + script chép/đổi tên sang `public/passports/{full,thumb}/{ISO3}.png`. Chạy lại script khi thêm/bớt ảnh |
 | `supabase/schema.sql` · `scripts/seed-supabase.mjs` · `.env.example` | Giữ sẵn cho bước nối Supabase |
 
 ## Nguồn dữ liệu

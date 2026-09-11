@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, IBM_Plex_Mono, Public_Sans } from "next/font/google";
+import TopNav from "@/components/top-nav";
 import "./globals.css";
 
 const sans = Public_Sans({
@@ -35,6 +36,7 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body className={`${sans.variable} ${archivo.variable} ${mono.variable}`}>
+        <TopNav />
         {children}
       </body>
     </html>

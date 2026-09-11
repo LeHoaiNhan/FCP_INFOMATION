@@ -16,8 +16,19 @@ import Combobox, { type ComboOption } from "./combobox";
 
 const BASE = { x: 0, y: 0, w: 1000, h: 480 };
 
-export default function PassportMap() {
-  const [passport, setPassport] = useState(DEFAULT_PASSPORT);
+interface PassportMapProps {
+  /** Hộ chiếu do trang cha điều khiển (vd trang gallery) — bỏ trống để tự quản lý state. */
+  passport?: string;
+  onPassportChange?: (code: string) => void;
+}
+
+export default function PassportMap({
+  passport: passportProp,
+  onPassportChange,
+}: PassportMapProps = {}) {
+  const [internalPassport, setInternalPassport] = useState(DEFAULT_PASSPORT);
+  const passport = passportProp ?? internalPassport;
+  const setPassport = onPassportChange ?? setInternalPassport;
   /** mã nước đến đang xem chi tiết; "" = tất cả các nước */
   const [selected, setSelected] = useState("");
   const [tierFilter, setTierFilter] = useState<TierKey | "">("");
@@ -650,15 +661,6 @@ export default function PassportMap() {
         <div className="mrz" suppressHydrationWarning>
           {mrz}
         </div>
-        <p className="foot-note">
-          Phép chiếu <strong>Equal Earth</strong> — bảo toàn tỷ lệ diện tích. Thang
-          màu đi từ <strong>xanh lá</strong> (ít thủ tục) qua xanh dương, cam, tới{" "}
-          <strong>đỏ</strong> (visa tại đại sứ quán). Vì có người khó phân biệt
-          xanh–đỏ, mỗi mức còn khác nhau về độ sáng và luôn kèm nhãn chữ ở chú
-          giải, khi rê chuột và trong bảng. Ở độ phân giải 110m, các nước siêu nhỏ
-          (Singapore, Bahrain, Maldives, Malta…) không có hình đa giác — vẫn có
-          trong bảng và ô tìm kiếm.
-        </p>
       </footer>
     </div>
   );
