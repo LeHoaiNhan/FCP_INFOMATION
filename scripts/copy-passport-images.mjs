@@ -15,7 +15,21 @@ const OUT_FULL = join(ROOT, "public", "passports", "full");
 const OUT_THUMB = join(ROOT, "public", "passports", "thumb");
 
 // Vài tên file lệch với data/nations.json (dataset dùng tên khác).
-const NAME_ALIASES = { Turkiye: "Turkey" };
+const NAME_ALIASES = {
+  Turkiye: "Turkey",
+  "Bolivia Plurinational State of": "Bolivia",
+  "Cabo Verde": "Cape Verde",
+  "Congo The Democratic Republic of the": "DR Congo",
+  "Cote dIvoire": "Ivory Coast",
+  Eswatini: "Swaziland",
+  "Holy See Vatican City State": "Vatican",
+  "Korea Democratic Peoples Republic of": "North Korea",
+  "Micronesia Federated States of": "Micronesia",
+  "Moldova Republic of": "Moldova",
+  "Palestine State of": "Palestine",
+  "Syrian Arab Republic": "Syria",
+  "Tanzania United Republic of": "Tanzania",
+};
 
 const nations = JSON.parse(readFileSync(join(ROOT, "data", "nations.json"), "utf8"));
 const codeByName = new Map(nations.map((n) => [n.name, n.code]));

@@ -110,6 +110,36 @@ export function destinationsFor(passport: string): Destination[] {
   );
 }
 
+/**
+ * Chiều ngược lại của `destinationsFor`: cố định một nước đến, tính mức thủ
+ * tục mà hộ chiếu của TỪNG nước cần để vào đó. Dùng khi Hộ chiếu = "tất cả"
+ * nhưng đã chọn một Nước đến cụ thể — bản đồ khi đó tô theo góc nhìn "ai cần
+ * gì để vào nước này" thay vì "hộ chiếu này đi đâu".
+ */
+export function originsFor(destination: string): Destination[] {
+  return NATIONS.map((n) => {
+    const shape = GEO_BY_ISO3[n.code];
+    const raw = MATRIX[n.code]?.[destination] ?? "";
+    const { tier, stay } = decodeRequirement(raw);
+    return {
+      code: n.code,
+      name: n.name,
+      a2: n.a2,
+      d: shape?.d ?? null,
+      tier: n.code === destination ? "home" : tier,
+      stay,
+      fee: null,
+      processing: null,
+      officialUrl: null,
+      lastVerified: null,
+    };
+  }).sort(
+    (a, b) =>
+      (ORDER[a.tier] ?? 9) - (ORDER[b.tier] ?? 9) ||
+      a.name.localeCompare(b.name),
+  );
+}
+
 export function passportName(code: string): string {
   if (!code) return "Tất cả";
   return NAME_BY_CODE[code] ?? code;

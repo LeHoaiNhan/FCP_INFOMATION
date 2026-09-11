@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   NATIONS,
   DEFAULT_PASSPORT,
@@ -8,14 +8,10 @@ import {
   passportCoverSrc,
   flagSrc,
 } from "@/lib/visa";
-import { TIERS } from "@/lib/tiers";
-import Combobox, { type ComboOption } from "./combobox";
-import PassportMap from "./passport-map";
 
 export default function PassportGallery() {
   const [passport, setPassport] = useState(DEFAULT_PASSPORT);
   const [q, setQ] = useState("");
-  const mapRef = useRef<HTMLDivElement>(null);
 
   const covered = useMemo(
     () =>
@@ -31,17 +27,9 @@ export default function PassportGallery() {
 
   function choose(code: string) {
     setPassport(code);
-    mapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  const allOptions: ComboOption[] = NATIONS.map((n) => ({
-    value: n.code,
-    label: n.name,
-    flag: flagSrc(n.a2),
-  }));
-
   return (
-    <>
     <div className="wrap gallery-wrap">
       <header>
         <div className="head-top">
@@ -58,19 +46,6 @@ export default function PassportGallery() {
           </div>
         </div>
       </header>
-
-      <section className="panel">
-        <h3 style={{ marginBottom: 12 }}>5 mức thủ tục nhập cảnh</h3>
-        <div className="tierinfo-grid">
-          {TIERS.map((t) => (
-            <div className="tierinfo-card" key={t.k}>
-              <span className="bar" style={{ background: `var(${t.v})` }} />
-              <div className="lbl">{t.label}</div>
-              {t.note && <p>{t.note}.</p>}
-            </div>
-          ))}
-        </div>
-      </section>
 
       <section className="gallery-section">
         <div className="gallery-head">
@@ -111,24 +86,7 @@ export default function PassportGallery() {
             <p className="combo-empty">Không có nước nào khớp &quot;{q}&quot;.</p>
           )}
         </div>
-
-        <p className="gallery-fallback">
-          Chưa có ảnh bìa cho hộ chiếu bạn cần? Chọn trong danh sách đầy đủ{" "}
-          {NATIONS.length} nước:
-        </p>
-        <Combobox
-          label="Hộ chiếu khác"
-          value={passport}
-          options={allOptions}
-          onChange={choose}
-          searchable
-        />
       </section>
     </div>
-
-    <div ref={mapRef}>
-      <PassportMap passport={passport} onPassportChange={setPassport} />
-    </div>
-    </>
   );
 }

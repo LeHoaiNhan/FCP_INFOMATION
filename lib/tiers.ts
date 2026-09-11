@@ -21,19 +21,51 @@ export interface Tier {
   v: string;
   /** chú thích ngắn, hiện khi rê chuột / trong thẻ kết luận */
   note?: string;
+  /** các bước cần chuẩn bị — hiện dạng checklist trong thẻ kết luận khi chọn 1 nước */
+  steps: string[];
 }
 
 export const TIERS: Tier[] = [
   { k: "free", n: 1, label: "Miễn thị thực", short: "Miễn thị thực", cls: "t-free", bar: "tier-b1", v: "--t1",
-    note: "Đưa hộ chiếu là qua, không giấy tờ xin trước" },
+    note: "Đưa hộ chiếu là qua, không giấy tờ xin trước",
+    steps: [
+      "Không cần xin visa trước — chuẩn bị hộ chiếu là đủ",
+      "Hộ chiếu còn hạn ít nhất 6 tháng kể từ ngày nhập cảnh",
+      "Mang vé khứ hồi / vé đi tiếp phòng khi hải quan hỏi",
+      "Một số nước có thể hỏi chứng minh tài chính hoặc nơi lưu trú ngay tại cửa khẩu",
+    ] },
   { k: "eta", n: 2, label: "eTA — cấp phép điện tử", short: "eTA", cls: "t-eta", bar: "tier-b2", v: "--t2",
-    note: "Khai online, duyệt tự động trong vài phút–vài giờ" },
+    note: "Khai online, duyệt tự động trong vài phút–vài giờ",
+    steps: [
+      "Khai form eTA online trước khi bay — thường duyệt trong vài phút đến vài giờ",
+      "Cần hộ chiếu, email và thẻ thanh toán quốc tế để khai form",
+      "Lưu email xác nhận eTA, mang theo (bản in hoặc điện thoại) khi làm thủ tục",
+      "Nên khai sớm — một số nước yêu cầu duyệt xong trước khi được lên máy bay",
+    ] },
   { k: "evisa", n: 3, label: "eVisa — thị thực điện tử", short: "eVisa", cls: "t-evisa", bar: "tier-b3", v: "--t3",
-    note: "Nộp hồ sơ online, chờ vài ngày, nhận file PDF — không cần đến đại sứ quán" },
+    note: "Nộp hồ sơ online, chờ vài ngày, nhận file PDF — không cần đến đại sứ quán",
+    steps: [
+      "Chuẩn bị hộ chiếu scan (trang thông tin) + ảnh chân dung nền trắng",
+      "Điền đơn và đóng phí trên cổng eVisa chính thức của nước đến",
+      "Chờ xét duyệt — thường vài ngày làm việc, có nước xử lý nhanh trong 24 giờ",
+      "In file eVisa (PDF) mang theo, xuất trình khi nhập cảnh",
+    ] },
   { k: "voa", n: 4, label: "Cấp tại cửa khẩu", short: "Tại cửa khẩu", cls: "t-voa", bar: "tier-b4", v: "--t4",
-    note: "Không xin trước — làm ngay tại sân bay/cửa khẩu khi tới nơi, đóng phí, dán tem" },
+    note: "Không xin trước — làm ngay tại sân bay/cửa khẩu khi tới nơi, đóng phí, dán tem",
+    steps: [
+      "Không cần xin trước — làm thủ tục ngay tại sân bay/cửa khẩu khi đến",
+      "Chuẩn bị ảnh thẻ và tiền mặt (thường là USD) để đóng phí tại quầy",
+      "Có sẵn vé khứ hồi và địa chỉ lưu trú để khai vào tờ khai VOA",
+      "Một số nước yêu cầu đăng ký trước online (pre-registration) dù vẫn cấp tại cửa khẩu — nên kiểm tra trước khi bay",
+    ] },
   { k: "visa", n: 5, label: "Visa tại đại sứ quán", short: "Visa ĐSQ", cls: "t-visa", bar: "tier-b5", v: "--t5",
-    note: "Nộp hồ sơ giấy tại đại sứ quán / lãnh sự / trung tâm visa, chờ 1–4 tuần, rồi mới bay được" },
+    note: "Nộp hồ sơ giấy tại đại sứ quán / lãnh sự / trung tâm visa, chờ 1–4 tuần, rồi mới bay được",
+    steps: [
+      "Tra cứu hồ sơ yêu cầu trên website đại sứ quán / lãnh sự / trung tâm visa của nước đến",
+      "Đặt lịch hẹn nộp hồ sơ — nhiều nước phải hẹn trước hàng tuần",
+      "Chuẩn bị hộ chiếu, ảnh, đơn xin visa, chứng minh tài chính và mục đích chuyến đi",
+      "Nộp hồ sơ trực tiếp, đóng phí, chờ xét duyệt khoảng 1–4 tuần",
+    ] },
 ];
 
 export const TMAP: Record<TierKey, Tier> = Object.fromEntries(
@@ -56,7 +88,7 @@ export const ORDER: Record<string, number> = {
 
 export function metaOf(
   tier: AnyTier,
-): { label: string; cls: string; v: string; short: string; note?: string } {
+): { label: string; cls: string; v: string; short: string; note?: string; steps?: string[] } {
   if (tier in TMAP) return TMAP[tier as TierKey];
   return EXTRA[tier as SpecialKey];
 }

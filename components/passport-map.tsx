@@ -5,6 +5,7 @@ import type { PointerEvent as RPointerEvent, MouseEvent as RMouseEvent } from "r
 import {
   NATIONS,
   destinationsFor,
+  originsFor,
   passportName,
   passportFlag,
   flagSrc,
@@ -35,8 +36,24 @@ export default function PassportMap({
   const [view, setView] = useState<"map" | "table">("map");
   /** true khi chọn một nước đến từ ô "Nước đến" → bản đồ chỉ sáng nước đó */
   const [focused, setFocused] = useState(false);
+  /** thang thứ bậc (chú giải) đang mở hay thu gọn */
+  const [legendOpen, setLegendOpen] = useState(true);
+  /** đang chờ kết quả định vị GPS → nước */
+  const [locating, setLocating] = useState(false);
+  /** giá trị hộ chiếu mới nhất — dùng trong callback định vị (tránh closure cũ) */
+  const passportRef = useRef(passport);
+  useEffect(() => {
+    passportRef.current = passport;
+  }, [passport]);
+  /** đảm bảo chỉ tự động định vị một lần khi trang vừa mở */
+  const autoLocateTried = useRef(false);
 
-  const destinations = useMemo(() => destinationsFor(passport), [passport]);
+  /** Hộ chiếu = "tất cả" nhưng đã chọn Nước đến → tô theo chiều ngược lại. */
+  const reverseMode = !passport && !!selected;
+  const destinations = useMemo(
+    () => (reverseMode ? originsFor(selected) : destinationsFor(passport)),
+    [passport, selected, reverseMode],
+  );
   const byCode = useMemo(
     () => new Map(destinations.map((d) => [d.code, d])),
     [destinations],
@@ -65,12 +82,44 @@ export default function PassportMap({
     null,
   );
   const moved = useRef(0);
+  /** kích thước SVG lúc bắt đầu kéo — lấy 1 lần, tránh getBoundingClientRect
+   * lặp lại mỗi pointermove (gây reflow, làm thao tác kéo bị giật/lag). */
+  const dragRect = useRef<DOMRect | null>(null);
+  /** gộp các pointermove trong cùng 1 khung hình lại, chỉ ghi viewBox 1 lần/frame */
+  const dragRaf = useRef<number | null>(null);
+  const pendingMove = useRef<{ x: number; y: number } | null>(null);
 
   const applyVB = () => {
     const v = vb.current;
     svgRef.current?.setAttribute("viewBox", `${v.x} ${v.y} ${v.w} ${v.h}`);
   };
   useEffect(applyVB, []);
+
+  useEffect(() => {
+    return () => {
+      if (dragRaf.current != null) cancelAnimationFrame(dragRaf.current);
+    };
+  }, []);
+
+  // Lăn chuột trên bản đồ = thu/phóng quanh vị trí con trỏ (kiểu Google Maps).
+  // Phải gắn bằng addEventListener({passive:false}) — onWheel của React mặc
+  // định passive nên preventDefault sẽ không chặn được cuộn trang.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    function onWheel(e: WheelEvent) {
+      e.preventDefault();
+      let dy = e.deltaY;
+      if (e.deltaMode === 1) dy *= 18; // đơn vị "dòng" (Firefox) → quy đổi gần đúng ra px
+      else if (e.deltaMode === 2) dy *= window.innerHeight; // đơn vị "trang"
+      const factor = Math.min(1.6, Math.max(0.625, Math.exp(dy * 0.0018)));
+      const rect = (svg as SVGSVGElement).getBoundingClientRect();
+      zoomAt(factor, e.clientX, e.clientY, rect);
+    }
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function clampVB() {
     const v = vb.current;
@@ -87,10 +136,79 @@ export default function PassportMap({
     clampVB();
     applyVB();
   }
+  /** Thu/phóng quanh một điểm màn hình cụ thể (giữ nguyên điểm đó dưới con trỏ). */
+  function zoomAt(f: number, clientX: number, clientY: number, rect: DOMRect) {
+    const v = vb.current;
+    const rx = (clientX - rect.left) / rect.width;
+    const ry = (clientY - rect.top) / rect.height;
+    const px = v.x + rx * v.w;
+    const py = v.y + ry * v.h;
+    const w = Math.min(BASE.w, Math.max(BASE.w / 12, v.w * f));
+    const h = (w * BASE.h) / BASE.w;
+    vb.current = { w, h, x: px - rx * w, y: py - ry * h };
+    clampVB();
+    applyVB();
+  }
   function resetZoom() {
     vb.current = { ...BASE };
     applyVB();
   }
+
+  /**
+   * Toạ độ GPS → mã hộ chiếu. Dùng BigDataCloud (reverse-geocode-client, miễn
+   * phí, không cần API key) để đổi lat/lon sang mã nước ISO2 rồi khớp với
+   * NATIONS — geo.json không có script dựng lại nên không tự tin suy ra đúng
+   * phép chiếu/tỷ lệ để tự làm point-in-polygon.
+   */
+  async function resolvePassportFromCoords(
+    lat: number,
+    lon: number,
+  ): Promise<string | null> {
+    const res = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=vi`,
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { countryCode?: string };
+    const a2 = data.countryCode?.toLowerCase();
+    if (!a2) return null;
+    return NATIONS.find((n) => n.a2 === a2)?.code ?? null;
+  }
+
+  /** Bấm nút định vị: lấy GPS rồi tự chuyển ô Hộ chiếu sang nước hiện tại. */
+  function locateMe() {
+    if (!("geolocation" in navigator)) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolvePassportFromCoords(pos.coords.latitude, pos.coords.longitude)
+          .then((code) => code && setPassport(code))
+          .catch(() => {})
+          .finally(() => setLocating(false));
+      },
+      () => setLocating(false),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
+    );
+  }
+
+  // Thử định vị một lần khi vừa mở trang, để sẵn đúng hộ chiếu cho tiện —
+  // chỉ áp dụng nếu người dùng chưa tự đổi hộ chiếu trong lúc chờ kết quả.
+  useEffect(() => {
+    if (autoLocateTried.current) return;
+    autoLocateTried.current = true;
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolvePassportFromCoords(pos.coords.latitude, pos.coords.longitude)
+          .then((code) => {
+            if (code && passportRef.current === DEFAULT_PASSPORT) setPassport(code);
+          })
+          .catch(() => {});
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 5 * 60_000 },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Phóng bản đồ về khung bao của một nước (đọc toạ độ từ path d). */
   function zoomToCountry(d: string) {
@@ -140,7 +258,15 @@ export default function PassportMap({
 
   function chooseDestination(code: string) {
     if (code) {
-      pickDestination(code);
+      if (passport) {
+        pickDestination(code);
+      } else {
+        // Chưa chọn hộ chiếu cụ thể: đổi Nước đến để bật chế độ xem ngược
+        // (originsFor) trên toàn bộ bản đồ — không zoom/focus vào một nước.
+        setSelected(code);
+        setFocused(false);
+        resetZoom();
+      }
     } else {
       setSelected("");
       setFocused(false);
@@ -192,9 +318,24 @@ export default function PassportMap({
 
   function onPointerDown(e: RPointerEvent<SVGSVGElement>) {
     drag.current = { x: e.clientX, y: e.clientY, vx: vb.current.x, vy: vb.current.y };
+    dragRect.current = svgRef.current?.getBoundingClientRect() ?? null;
     moved.current = 0;
     svgRef.current?.classList.add("dragging");
     svgRef.current?.setPointerCapture(e.pointerId);
+  }
+  /** Ghi viewBox theo điểm chuột mới nhất — chạy tối đa 1 lần mỗi khung hình. */
+  function flushDragMove() {
+    dragRaf.current = null;
+    const d = drag.current;
+    const r = dragRect.current;
+    const m = pendingMove.current;
+    if (!d || !r || !m) return;
+    const dx = ((m.x - d.x) * vb.current.w) / r.width;
+    const dy = ((m.y - d.y) * vb.current.h) / r.height;
+    vb.current.x = d.vx - dx;
+    vb.current.y = d.vy - dy;
+    clampVB();
+    applyVB();
   }
   function onPointerMove(e: RPointerEvent<SVGSVGElement>) {
     if (!drag.current) {
@@ -203,35 +344,43 @@ export default function PassportMap({
       else hideTip();
       return;
     }
-    const svg = svgRef.current;
-    if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const d = drag.current;
-    const dx = ((e.clientX - d.x) * vb.current.w) / r.width;
-    const dy = ((e.clientY - d.y) * vb.current.h) / r.height;
     moved.current = Math.max(
       moved.current,
-      Math.abs(e.clientX - d.x) + Math.abs(e.clientY - d.y),
+      Math.abs(e.clientX - drag.current.x) + Math.abs(e.clientY - drag.current.y),
     );
-    vb.current.x = d.vx - dx;
-    vb.current.y = d.vy - dy;
-    clampVB();
-    applyVB();
+    pendingMove.current = { x: e.clientX, y: e.clientY };
+    if (dragRaf.current == null) {
+      dragRaf.current = requestAnimationFrame(flushDragMove);
+    }
   }
   const endDrag = () => {
     drag.current = null;
+    dragRect.current = null;
+    pendingMove.current = null;
+    if (dragRaf.current != null) {
+      cancelAnimationFrame(dragRaf.current);
+      dragRaf.current = null;
+    }
     svgRef.current?.classList.remove("dragging");
   };
+  /** Chọn một nước làm hộ chiếu đang xem — dùng ở chế độ xem ngược. */
+  function pickOrigin(code: string) {
+    if (code !== selected) setPassport(code);
+  }
+
   function onClick(e: RMouseEvent<SVGSVGElement>) {
     if (moved.current > 5) return;
     // setPointerCapture (cho kéo-thả) khiến e.target luôn là <svg> gốc ở đây,
     // nên phải dò lại phần tử thật dưới con trỏ bằng toạ độ.
     const real = document.elementFromPoint(e.clientX, e.clientY);
     const code = real && codeAt(real);
-    if (code && tierOf(code) !== "nodata") {
-      setSelected(code);
-      setFocused(false);
+    if (!code || tierOf(code) === "nodata") return;
+    if (reverseMode) {
+      pickOrigin(code);
+      return;
     }
+    setSelected(code);
+    setFocused(false);
   }
 
   // path list — dựng lại khi hộ chiếu / điểm chọn / bộ lọc đổi
@@ -270,7 +419,7 @@ export default function PassportMap({
 
   const tableRows = destinations.filter((d) => {
     if (d.tier === "home") return false;
-    if (selected && d.code !== selected) return false;
+    if (!reverseMode && selected && d.code !== selected) return false;
     if (tierFilter && d.tier !== tierFilter) return false;
     return true;
   });
@@ -314,9 +463,15 @@ export default function PassportMap({
             className="map"
             viewBox="0 0 1000 480"
             role="img"
-            aria-label={`Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu ${passportName(
-              passport,
-            )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`}
+            aria-label={
+              reverseMode
+                ? `Bản đồ thế giới tô màu theo mức thủ tục mà hộ chiếu từng nước cần để vào ${passportName(
+                    selected,
+                  )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`
+                : `Bản đồ thế giới tô màu theo mức thủ tục nhập cảnh đối với hộ chiếu ${passportName(
+                    passport,
+                  )}. Bảng dữ liệu tương đương có ở chế độ xem Bảng.`
+            }
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endDrag}
@@ -332,7 +487,7 @@ export default function PassportMap({
         <div className="mapapp-table" hidden={view !== "table"}>
           <div className="table-bar">
             <span>
-              {tableRows.length} nước
+              {tableRows.length} {reverseMode ? "hộ chiếu" : "nước"}
               {tierFilter && ` · ${metaOf(tierFilter).label}`}
             </span>
             {(selected || tierFilter) && (
@@ -352,7 +507,7 @@ export default function PassportMap({
             <table>
               <thead>
                 <tr>
-                  <th scope="col">Nước đến</th>
+                  <th scope="col">{reverseMode ? "Hộ chiếu" : "Nước đến"}</th>
                   <th scope="col">Mức thủ tục</th>
                   <th scope="col">Lưu trú</th>
                   <th scope="col">Phí</th>
@@ -373,7 +528,9 @@ export default function PassportMap({
                       <tr
                         key={d.code}
                         className={d.code === selected ? "row-sel" : undefined}
-                        onClick={() => pickDestination(d.code)}
+                        onClick={() =>
+                          reverseMode ? pickOrigin(d.code) : pickDestination(d.code)
+                        }
                       >
                         <td>
                           <span className="cell-nation">
@@ -408,6 +565,20 @@ export default function PassportMap({
         </div>
 
         {view === "map" && (
+          <div className="locate mapapp-locate">
+            <button
+              title="Dùng vị trí của bạn để chọn hộ chiếu"
+              aria-label="Dùng vị trí của bạn để chọn hộ chiếu"
+              className={locating ? "spin" : undefined}
+              disabled={locating}
+              onClick={locateMe}
+            >
+              ⌖
+            </button>
+          </div>
+        )}
+
+        {view === "map" && (
           <div className="zoom mapapp-zoom">
             <button title="Phóng to" aria-label="Phóng to" onClick={() => zoom(1 / 1.5)}>
               +
@@ -423,25 +594,6 @@ export default function PassportMap({
       </div>
 
       <div className="mapapp-toolbar">
-        <div className="passport">
-          {passportFlag(passport) ? (
-            <img
-              className="flag-img flag-lg"
-              src={passportFlag(passport) as string}
-              alt=""
-              width={30}
-              height={22}
-            />
-          ) : (
-            <span className="flag" aria-hidden="true">
-              {passport ? "🛂" : "🌐"}
-            </span>
-          )}
-          <span>
-            <span className="code">{passport ? `P<${passport}` : "TẤT CẢ"}</span>
-            <span className="cap">{passportName(passport)}</span>
-          </span>
-        </div>
         <Combobox
           label="Hộ chiếu"
           value={passport}
@@ -480,27 +632,40 @@ export default function PassportMap({
       </div>
 
       {view === "map" && (
-        <div className="mapapp-legend">
+        <div className={`mapapp-legend${legendOpen ? "" : " collapsed"}`}>
           <div className="legend-scale">
             <span className="eyebrow">Thang thứ bậc · bấm để lọc</span>
+            <button
+              type="button"
+              className="legend-toggle"
+              aria-expanded={legendOpen}
+              onClick={() => setLegendOpen((v) => !v)}
+            >
+              {legendOpen ? "Thu gọn" : "Mở rộng"}
+              <span className="legend-toggle-caret" aria-hidden="true">
+                {legendOpen ? "▾" : "▸"}
+              </span>
+            </button>
           </div>
-          <div className="tiers">
-            {TIERS.map((t) => (
-              <button
-                key={t.k}
-                className={`tier ${t.bar}${tierFilter && tierFilter !== t.k ? " off" : ""}`}
-                aria-pressed={tierFilter === t.k}
-                onClick={() => setTierFilter((cur) => (cur === t.k ? "" : t.k))}
-              >
-                <span className="bar" />
-                <span className="lbl">{t.label}</span>
-                <span className="cnt">
-                  {counts[t.k] ?? 0}
-                  <em>nước</em>
-                </span>
-              </button>
-            ))}
-          </div>
+          {legendOpen && (
+            <div className="tiers">
+              {TIERS.map((t) => (
+                <button
+                  key={t.k}
+                  className={`tier ${t.bar}${tierFilter && tierFilter !== t.k ? " off" : ""}`}
+                  aria-pressed={tierFilter === t.k}
+                  onClick={() => setTierFilter((cur) => (cur === t.k ? "" : t.k))}
+                >
+                  <span className="bar" />
+                  <span className="lbl">{t.label}</span>
+                  <span className="cnt">
+                    {counts[t.k] ?? 0}
+                    <em>nước</em>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -511,11 +676,15 @@ export default function PassportMap({
             {NATIONS.length} điểm đến
           </div>
           <h1 className="panel-title">
-            {passport ? `Hộ chiếu ${passportName(passport)} đi đâu?` : "Tất cả hộ chiếu đi đâu?"}
+            {passport
+              ? `Hộ chiếu ${passportName(passport)} đi đâu?`
+              : selected
+                ? `Vào ${passportName(selected)} cần visa gì?`
+                : "Tất cả hộ chiếu đi đâu?"}
           </h1>
         </div>
 
-        {!passport ? (
+        {!passport && !selected ? (
           <>
             <div className="verdict-head">
               <div>
@@ -525,9 +694,60 @@ export default function PassportMap({
             </div>
             <p className="verdict-note">
               Mỗi hộ chiếu có mức thủ tục khác nhau ở từng nước, nên khi để{" "}
-              <strong>Hộ chiếu</strong> là &quot;tất cả&quot; thì bản đồ không
-              có gì để tô màu. Chọn một hộ chiếu cụ thể để xem chi tiết.
+              <strong>Hộ chiếu</strong> là &quot;tất cả&quot; thì bản đồ chưa
+              có gì để tô màu. Chọn một hộ chiếu cụ thể để xem hộ chiếu đó đi
+              đâu được, hoặc chọn một <strong>Nước đến</strong> để xem nước đó
+              cần visa gì từ mọi hộ chiếu.
             </p>
+          </>
+        ) : reverseMode ? (
+          <>
+            <div className="verdict-head">
+              <div>
+                <h2 className="verdict-name">
+                  {passportFlag(selected) && (
+                    <img
+                      className="flag-img flag-lg"
+                      src={passportFlag(selected) as string}
+                      alt=""
+                      width={28}
+                      height={21}
+                    />
+                  )}
+                  {passportName(selected)}
+                </h2>
+                <div className="iso">TẤT CẢ HỘ CHIẾU → {selected}</div>
+              </div>
+            </div>
+            <p className="verdict-note">
+              Bản đồ đang tô theo mức thủ tục mà hộ chiếu <strong>từng
+              nước</strong> cần để vào {passportName(selected)}. Bấm vào một
+              nước trên bản đồ (hoặc một dòng trong bảng) để xem chi tiết hộ
+              chiếu đó đi đâu được.
+            </p>
+            <dl className="facts">
+              <div className="fact">
+                <dt>Miễn thị thực</dt>
+                <dd>
+                  {counts.free ?? 0}
+                  <small>hộ chiếu</small>
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Làm online</dt>
+                <dd>
+                  {(counts.eta ?? 0) + (counts.evisa ?? 0)}
+                  <small>hộ chiếu</small>
+                </dd>
+              </div>
+              <div className="fact">
+                <dt>Visa tại ĐSQ</dt>
+                <dd>
+                  {counts.visa ?? 0}
+                  <small>hộ chiếu</small>
+                </dd>
+              </div>
+            </dl>
           </>
         ) : sel ? (
           <>
@@ -576,6 +796,16 @@ export default function PassportMap({
               </div>
             </dl>
             {selMeta.note && <p className="verdict-note">{selMeta.note}.</p>}
+            {selMeta.steps && selMeta.steps.length > 0 && (
+              <div className="steps">
+                <h3>Cần chuẩn bị gì</h3>
+                <ol>
+                  {selMeta.steps.map((s, i) => (
+                    <li key={i}>{s}</li>
+                  ))}
+                </ol>
+              </div>
+            )}
             <div className="src">
               <span>
                 Nguồn chính thức: <span className="mono">chưa gắn</span>
@@ -630,46 +860,41 @@ export default function PassportMap({
             <li>
               <span className="num">{counts.free ?? 0}</span>
               <p>
-                <b>Nước miễn thị thực</b> cho hộ chiếu {passportName(passport)} —
-                vào thẳng, không giấy tờ xin trước.
+                <b>{reverseMode ? "Hộ chiếu miễn thị thực" : "Nước miễn thị thực"}</b>{" "}
+                {reverseMode ? (
+                  <>khi vào {passportName(selected)}</>
+                ) : (
+                  <>cho hộ chiếu {passportName(passport)}</>
+                )}{" "}
+                — vào thẳng, không giấy tờ xin trước.
               </p>
             </li>
             <li>
               <span className="num">{counts.evisa ?? 0}</span>
               <p>
-                <b>Nước cấp eVisa online.</b> Nộp hồ sơ qua web, nhận file PDF,
-                không cần đến đại sứ quán.
+                <b>{reverseMode ? "Hộ chiếu" : "Nước"} cấp eVisa online.</b> Nộp
+                hồ sơ qua web, nhận file PDF, không cần đến đại sứ quán.
               </p>
             </li>
             <li>
               <span className="num">{counts.visa ?? 0}</span>
               <p>
-                <b>Nước phải xin visa tại đại sứ quán</b> — nộp hồ sơ giấy trực
-                tiếp, chờ 1–4 tuần rồi mới bay được.
+                <b>{reverseMode ? "Hộ chiếu" : "Nước"} phải xin visa tại đại sứ
+                quán</b> — nộp hồ sơ giấy trực tiếp, chờ 1–4 tuần rồi mới bay
+                được.
               </p>
             </li>
             <li>
               <span className="num">{pct}%</span>
               <p>
-                <b>Điểm đến làm được thủ tục không cần đến đại sứ quán</b> — tính
-                cả miễn thị thực, eTA, eVisa và cấp tại cửa khẩu.
+                <b>
+                  {reverseMode ? "Hộ chiếu" : "Điểm đến"} làm được thủ tục
+                  không cần đến đại sứ quán
+                </b>{" "}
+                — tính cả miễn thị thực, eTA, eVisa và cấp tại cửa khẩu.
               </p>
             </li>
           </ul>
-        </div>
-
-        <div className="notice">
-          <span className="icn" aria-hidden="true">
-            [i]
-          </span>
-          <span>
-            Nguồn: <b>Passport Index Dataset</b> (ilyankou, giấy phép MIT) — tổng
-            hợp thông tin công khai, cập nhật vài lần mỗi năm,{" "}
-            <b>không phải real-time</b>. Lệ phí và thời gian xử lý dataset không
-            có. Bản chạy thật cần gắn <span className="mono">officialUrl</span> +{" "}
-            <span className="mono">lastVerified</span> cho từng dòng và đối chiếu
-            cổng chính thức của nước đến.
-          </span>
         </div>
 
         <div className="mrz" suppressHydrationWarning>

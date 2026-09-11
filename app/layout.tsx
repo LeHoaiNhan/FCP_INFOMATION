@@ -38,6 +38,7 @@ export default function RootLayout({
       <body className={`${sans.variable} ${archivo.variable} ${mono.variable}`}>
         <TopNav />
         {children}
+        <p className="site-credit">© 2026 Vuvgo.com</p>
       </body>
     </html>
   );
